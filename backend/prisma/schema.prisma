@@ -1,0 +1,910 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  role          UserRole  @default(TECHNICIAN)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  technician    Technician?
+  salesRep      SalesRep?
+  sessions      Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TECHNICIAN
+  SALES
+  RECEPTIONIST
+}
+
+// Customer Management
+model Customer {
+  id              String    @id @default(uuid())
+  companyName     String?
+  firstName       String
+  lastName        String
+  email           String    @unique
+  phone           String
+  alternatePhone  String?
+  customerType    CustomerType @default(RESIDENTIAL)
+  status          CustomerStatus @default(ACTIVE)
+  notes           String?
+  referralSource  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  properties      Property[]
+  contracts       Contract[]
+  invoices        Invoice[]
+  leads           Lead[]
+  quotes          Quote[]
+  communications  Communication[]
+}
+
+enum CustomerType {
+  RESIDENTIAL
+  COMMERCIAL
+  INDUSTRIAL
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PROSPECT
+}
+
+// Property Information
+model Property {
+  id              String    @id @default(uuid())
+  customerId      String
+  name            String
+  addressLine1    String
+  addressLine2    String?
+  city            String
+  state           String
+  zipCode         String
+  country         String    @default("USA")
+  latitude        Float?
+  longitude       Float?
+  propertyType    PropertyType @default(SINGLE_FAMILY)
+  squareFootage   Int?
+  yearBuilt       Int?
+  accessNotes     String?
+  gateCode        String?
+  hasPets         Boolean   @default(false)
+  petDetails      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pestIssues      PestIssue[]
+  services        Service[]
+  inspections     Inspection[]
+  serviceOrders   ServiceOrder[]
+}
+
+enum PropertyType {
+  SINGLE_FAMILY
+  MULTI_FAMILY
+  APARTMENT
+  CONDO
+  COMMERCIAL
+  INDUSTRIAL
+  WAREHOUSE
+  RESTAURANT
+  OFFICE
+  RETAIL
+  OTHER
+}
+
+// Pest Issues Log
+model PestIssue {
+  id              String    @id @default(uuid())
+  propertyId      String
+  pestTypeId      String
+  severity        Severity  @default(MODERATE)
+  location        String
+  description     String?
+  firstReported   DateTime  @default(now())
+  lastObserved    DateTime?
+  status          IssueStatus @default(ACTIVE)
+  photoUrls       String[]
+  aiIdentified    Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  pestType        PestType  @relation(fields: [pestTypeId], references: [id])
+  treatments      TreatmentRecord[]
+}
+
+enum Severity {
+  LOW
+  MODERATE
+  HIGH
+  SEVERE
+}
+
+enum IssueStatus {
+  ACTIVE
+  MONITORING
+  RESOLVED
+  RECURRING
+}
+
+model PestType {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  category        String
+  description     String?
+  commonTreatments String[]
+  seasonalPeak    String[]
+  riskLevel       String?
+  imageUrl        String?
+  createdAt       DateTime  @default(now())
+
+  pestIssues      PestIssue[]
+  treatmentRecommendations TreatmentRecommendation[]
+}
+
+// Contract Management
+model Contract {
+  id              String    @id @default(uuid())
+  customerId      String
+  contractNumber  String    @unique
+  name            String
+  contractType    ContractType @default(RECURRING)
+  startDate       DateTime
+  endDate         DateTime?
+  billingFrequency BillingFrequency @default(MONTHLY)
+  contractValue   Float
+  status          ContractStatus @default(ACTIVE)
+  terms           String?
+  signedDate      DateTime?
+  signatureUrl    String?
+  autoRenew       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceOrders   ServiceOrder[]
+  invoices        Invoice[]
+}
+
+enum ContractType {
+  ONE_TIME
+  RECURRING
+  ANNUAL
+}
+
+enum BillingFrequency {
+  ONE_TIME
+  WEEKLY
+  BI_WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+}
+
+// Billing Information
+model Invoice {
+  id              String    @id @default(uuid())
+  customerId      String
+  contractId      String?
+  invoiceNumber   String    @unique
+  issueDate       DateTime  @default(now())
+  dueDate         DateTime
+  subtotal        Float
+  tax             Float     @default(0)
+  total           Float
+  amountPaid      Float     @default(0)
+  status          InvoiceStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  contract        Contract? @relation(fields: [contractId], references: [id])
+  lineItems       InvoiceLineItem[]
+  payments        Payment[]
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  SENT
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceLineItem {
+  id              String    @id @default(uuid())
+  invoiceId       String
+  description     String
+  quantity        Float
+  unitPrice       Float
+  total           Float
+  serviceOrderId  String?
+
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id              String    @id @default(uuid())
+  invoiceId       String
+  amount          Float
+  paymentMethod   PaymentMethod
+  transactionId   String?
+  paymentDate     DateTime  @default(now())
+  notes           String?
+
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  CREDIT_CARD
+  DEBIT_CARD
+  ACH
+  OTHER
+}
+
+// Service Management
+model ServiceType {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  description     String?
+  category        ServiceCategory @default(GENERAL)
+  basePrice       Float
+  duration        Int       // in minutes
+  isRecurring     Boolean   @default(false)
+  frequency       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  services        Service[]
+  serviceOrders   ServiceOrder[]
+}
+
+enum ServiceCategory {
+  GENERAL
+  TERMITE
+  RODENT
+  MOSQUITO
+  BED_BUG
+  WILDLIFE
+  FUMIGATION
+  INSPECTION
+  PREVENTION
+}
+
+model Service {
+  id              String    @id @default(uuid())
+  propertyId      String
+  serviceTypeId   String
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  status          ServiceStatus @default(SCHEDULED)
+  technicianId    String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  serviceType     ServiceType @relation(fields: [serviceTypeId], references: [id])
+  technician      Technician? @relation(fields: [technicianId], references: [id])
+  treatments      TreatmentRecord[]
+}
+
+enum ServiceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+  NO_SHOW
+}
+
+// Products
+model Product {
+  id              String    @id @default(uuid())
+  name            String
+  sku             String    @unique
+  barcode         String?   @unique
+  category        String
+  manufacturer    String?
+  activeIngredient String?
+  concentration   String?
+  epaNumber       String?
+  unitOfMeasure   String
+  unitCost        Float
+  inStock         Float     @default(0)
+  reorderLevel    Float     @default(10)
+  safetyDataSheetUrl String?
+  isRestricted    Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  treatments      TreatmentRecord[]
+  productUsages   ProductUsage[]
+}
+
+// Treatment Records
+model TreatmentRecord {
+  id              String    @id @default(uuid())
+  serviceId       String?
+  pestIssueId     String?
+  productId       String
+  applicationMethod String
+  areasTreated    String[]
+  quantity        Float
+  unit            String
+  dilutionRate    String?
+  targetPests     String[]
+  weatherConditions String?
+  temperature     Float?
+  humidity        Float?
+  windSpeed       Float?
+  notes           String?
+  appliedAt       DateTime  @default(now())
+  appliedById     String
+
+  // Relations
+  service         Service?  @relation(fields: [serviceId], references: [id])
+  pestIssue       PestIssue? @relation(fields: [pestIssueId], references: [id])
+  product         Product   @relation(fields: [productId], references: [id])
+  appliedBy       Technician @relation(fields: [appliedById], references: [id])
+}
+
+// Service Orders (Work Orders)
+model ServiceOrder {
+  id              String    @id @default(uuid())
+  orderNumber     String    @unique
+  propertyId      String
+  contractId      String?
+  serviceTypeId   String
+  technicianId    String?
+  scheduledDate   DateTime
+  scheduledTimeStart String?
+  scheduledTimeEnd String?
+  completedDate   DateTime?
+  status          ServiceOrderStatus @default(PENDING)
+  priority        Priority  @default(NORMAL)
+  isRetreatment   Boolean   @default(false)
+  originalOrderId String?
+  customerNotes   String?
+  technicianNotes String?
+  internalNotes   String?
+  signatureUrl    String?
+  signedBy        String?
+  signedAt        DateTime?
+  photoUrls       String[]
+  timeIn          DateTime?
+  timeOut         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  contract        Contract? @relation(fields: [contractId], references: [id])
+  serviceType     ServiceType @relation(fields: [serviceTypeId], references: [id])
+  technician      Technician? @relation(fields: [technicianId], references: [id])
+  productUsages   ProductUsage[]
+  followUps       FollowUp[]
+}
+
+enum ServiceOrderStatus {
+  PENDING
+  CONFIRMED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Product Usage per Service Order
+model ProductUsage {
+  id              String    @id @default(uuid())
+  serviceOrderId  String
+  productId       String
+  quantity        Float
+  unit            String
+  applicationRate String?
+  areasTreated    String[]
+  notes           String?
+  usedAt          DateTime  @default(now())
+
+  serviceOrder    ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  product         Product   @relation(fields: [productId], references: [id])
+}
+
+// Technician Management
+model Technician {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  employeeId      String    @unique
+  licenseNumber   String?
+  licenseState    String?
+  licenseExpiry   DateTime?
+  certifications  String[]
+  specializations String[]
+  vehicleId       String?
+  territoryId     String?
+  isAvailable     Boolean   @default(true)
+  currentLatitude Float?
+  currentLongitude Float?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  territory       Territory? @relation(fields: [territoryId], references: [id])
+  services        Service[]
+  serviceOrders   ServiceOrder[]
+  treatments      TreatmentRecord[]
+  schedules       TechnicianSchedule[]
+  timeEntries     TimeEntry[]
+}
+
+// Scheduling
+model TechnicianSchedule {
+  id              String    @id @default(uuid())
+  technicianId    String
+  date            DateTime
+  startTime       String
+  endTime         String
+  isAvailable     Boolean   @default(true)
+  notes           String?
+
+  technician      Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, date])
+}
+
+// Time Tracking
+model TimeEntry {
+  id              String    @id @default(uuid())
+  technicianId    String
+  date            DateTime
+  clockIn         DateTime
+  clockOut        DateTime?
+  breakMinutes    Int       @default(0)
+  notes           String?
+  status          TimeEntryStatus @default(PENDING)
+
+  technician      Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+}
+
+enum TimeEntryStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Territory Management
+model Territory {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  description     String?
+  zipCodes        String[]
+  color           String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+
+  technicians     Technician[]
+}
+
+// Route Optimization
+model Route {
+  id              String    @id @default(uuid())
+  date            DateTime
+  technicianId    String
+  stops           Json      // Array of stops with order
+  totalDistance   Float?
+  totalDuration   Int?      // in minutes
+  optimizedAt     DateTime?
+  status          RouteStatus @default(PLANNED)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum RouteStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+// Compliance - License Tracking
+model License {
+  id              String    @id @default(uuid())
+  type            LicenseType
+  licenseNumber   String
+  issuedBy        String
+  issuedTo        String
+  issueDate       DateTime
+  expiryDate      DateTime
+  status          LicenseStatus @default(ACTIVE)
+  documentUrl     String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum LicenseType {
+  BUSINESS
+  PESTICIDE_APPLICATOR
+  RESTRICTED_USE
+  OPERATOR
+  COMMERCIAL
+}
+
+enum LicenseStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  PENDING_RENEWAL
+}
+
+// Product Registrations
+model ProductRegistration {
+  id              String    @id @default(uuid())
+  productName     String
+  epaNumber       String
+  stateRegNumber  String?
+  state           String
+  registrationDate DateTime
+  expiryDate      DateTime
+  status          String    @default("ACTIVE")
+  documentUrl     String?
+  createdAt       DateTime  @default(now())
+}
+
+// Safety Data Sheets
+model SafetyDataSheet {
+  id              String    @id @default(uuid())
+  productName     String
+  manufacturer    String
+  revisionDate    DateTime
+  documentUrl     String
+  hazardClassifications String[]
+  firstAidMeasures String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Usage Reporting
+model UsageReport {
+  id              String    @id @default(uuid())
+  reportPeriod    String    // e.g., "2024-Q1"
+  productName     String
+  epaNumber       String?
+  totalQuantity   Float
+  unit            String
+  applicationCount Int
+  reportedBy      String
+  submittedAt     DateTime?
+  status          String    @default("DRAFT")
+  createdAt       DateTime  @default(now())
+}
+
+// Sales - Lead Management
+model Lead {
+  id              String    @id @default(uuid())
+  customerId      String?
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String
+  companyName     String?
+  addressLine1    String?
+  city            String?
+  state           String?
+  zipCode         String?
+  source          LeadSource @default(WEBSITE)
+  status          LeadStatus @default(NEW)
+  pestConcerns    String[]
+  notes           String?
+  assignedToId    String?
+  estimatedValue  Float?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  assignedTo      SalesRep? @relation(fields: [assignedToId], references: [id])
+  inspections     Inspection[]
+  quotes          Quote[]
+  followUps       FollowUp[]
+}
+
+enum LeadSource {
+  WEBSITE
+  PHONE
+  REFERRAL
+  ADVERTISING
+  SOCIAL_MEDIA
+  PARTNER
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  INSPECTION_SCHEDULED
+  QUOTED
+  NEGOTIATION
+  WON
+  LOST
+}
+
+// Sales Rep
+model SalesRep {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  employeeId      String    @unique
+  commissionRate  Float     @default(0.1)
+  quota           Float?
+  createdAt       DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leads           Lead[]
+  quotes          Quote[]
+}
+
+// Inspections
+model Inspection {
+  id              String    @id @default(uuid())
+  leadId          String?
+  propertyId      String?
+  inspectorId     String
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  status          InspectionStatus @default(SCHEDULED)
+  findings        Json?     // Pest findings, damage, recommendations
+  photoUrls       String[]
+  reportUrl       String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lead            Lead?     @relation(fields: [leadId], references: [id])
+  property        Property? @relation(fields: [propertyId], references: [id])
+}
+
+enum InspectionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Quotes
+model Quote {
+  id              String    @id @default(uuid())
+  quoteNumber     String    @unique
+  customerId      String?
+  leadId          String?
+  salesRepId      String?
+  validUntil      DateTime
+  subtotal        Float
+  discount        Float     @default(0)
+  tax             Float     @default(0)
+  total           Float
+  status          QuoteStatus @default(DRAFT)
+  notes           String?
+  terms           String?
+  aiGenerated     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  lead            Lead?     @relation(fields: [leadId], references: [id])
+  salesRep        SalesRep? @relation(fields: [salesRepId], references: [id])
+  lineItems       QuoteLineItem[]
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model QuoteLineItem {
+  id              String    @id @default(uuid())
+  quoteId         String
+  description     String
+  serviceType     String?
+  quantity        Float
+  unitPrice       Float
+  total           Float
+  frequency       String?
+  notes           String?
+
+  quote           Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}
+
+// Follow-ups
+model FollowUp {
+  id              String    @id @default(uuid())
+  leadId          String?
+  serviceOrderId  String?
+  type            FollowUpType
+  dueDate         DateTime
+  completedDate   DateTime?
+  status          FollowUpStatus @default(PENDING)
+  notes           String?
+  aiGenerated     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  lead            Lead?     @relation(fields: [leadId], references: [id])
+  serviceOrder    ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+}
+
+enum FollowUpType {
+  CALL
+  EMAIL
+  TEXT
+  VISIT
+  SERVICE_REMINDER
+  PAYMENT_REMINDER
+  SATISFACTION_SURVEY
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+// Communication Log
+model Communication {
+  id              String    @id @default(uuid())
+  customerId      String
+  type            CommunicationType
+  direction       String    // INBOUND or OUTBOUND
+  subject         String?
+  content         String
+  status          String?
+  aiHandled       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+enum CommunicationType {
+  PHONE
+  EMAIL
+  SMS
+  CHAT
+}
+
+// AI Treatment Recommendations
+model TreatmentRecommendation {
+  id              String    @id @default(uuid())
+  pestTypeId      String
+  severity        Severity
+  propertyType    PropertyType
+  season          String
+  recommendedProducts String[]
+  applicationMethods String[]
+  frequency       String
+  estimatedCost   Float?
+  effectivenessScore Float?
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  pestType        PestType  @relation(fields: [pestTypeId], references: [id])
+}
+
+// Seasonal Predictions
+model SeasonalPrediction {
+  id              String    @id @default(uuid())
+  region          String
+  zipCode         String?
+  pestType        String
+  month           Int
+  year            Int
+  riskLevel       String    // LOW, MODERATE, HIGH, VERY_HIGH
+  confidence      Float
+  factors         String[]
+  recommendations String[]
+  createdAt       DateTime  @default(now())
+
+  @@unique([region, pestType, month, year])
+}
+
+// AI Pest Identification Log
+model PestIdentification {
+  id              String    @id @default(uuid())
+  imageUrl        String
+  identifiedPest  String?
+  confidence      Float?
+  alternativePests Json?    // Array of alternative identifications
+  recommendations String[]
+  status          String    @default("PENDING")
+  createdAt       DateTime  @default(now())
+}
+
+// Application Settings
+model Setting {
+  id              String    @id @default(uuid())
+  key             String    @unique
+  value           String
+  description     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Configuration for extensible dropdown options
+model Configuration {
+  id              String    @id @default(uuid())
+  category        String    // e.g., "PRODUCT_CATEGORY", "LEAD_SOURCE", "PAYMENT_METHOD"
+  value           String
+  label           String
+  sortOrder       Int       @default(0)
+  isActive        Boolean   @default(true)
+  isDefault       Boolean   @default(false)
+  metadata        Json?     // Additional data if needed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([category, value])
+  @@index([category])
+}
