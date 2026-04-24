@@ -22,6 +22,13 @@ router.get('/', authMiddleware, async (req, res) => {
       ];
     }
 
+    // Sorting support
+    const { sortBy, sortOrder = 'desc' } = req.query;
+    const validSortFields = ['firstName', 'lastName', 'source', 'status', 'estimatedValue', 'createdAt'];
+    const orderBy = validSortFields.includes(sortBy)
+      ? { [sortBy]: sortOrder === 'asc' ? 'asc' : 'desc' }
+      : { createdAt: 'desc' };
+
     const [leads, total] = await Promise.all([
       req.prisma.lead.findMany({
         where,
@@ -30,7 +37,7 @@ router.get('/', authMiddleware, async (req, res) => {
           customer: { select: { id: true, firstName: true, lastName: true } },
           _count: { select: { inspections: true, quotes: true } }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: parseInt(limit)
       }),
@@ -115,6 +122,29 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     console.error('Delete lead error:', error);
     res.status(500).json({ error: 'Failed to delete lead' });
   }
+});
+
+// Bulk delete leads
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const result = await req.prisma.lead.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${result.count} leads deleted`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to delete leads' }); }
+});
+
+// Bulk update leads
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const allowedFields = ['status', 'source'];
+    const updateData = {};
+    for (const field of allowedFields) { if (data[field] !== undefined) updateData[field] = data[field]; }
+    const result = await req.prisma.lead.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${result.count} leads updated`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to update leads' }); }
 });
 
 // Convert lead to customer

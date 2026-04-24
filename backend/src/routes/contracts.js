@@ -22,6 +22,13 @@ router.get('/', authMiddleware, async (req, res) => {
     if (customerId) where.customerId = customerId;
     if (type) where.contractType = type;
 
+    // Sorting support
+    const { sortBy, sortOrder = 'desc' } = req.query;
+    const validSortFields = ['contractNumber', 'name', 'contractType', 'startDate', 'endDate', 'contractValue', 'status', 'createdAt'];
+    const orderBy = validSortFields.includes(sortBy)
+      ? { [sortBy]: sortOrder === 'asc' ? 'asc' : 'desc' }
+      : { createdAt: 'desc' };
+
     const [contracts, total] = await Promise.all([
       req.prisma.contract.findMany({
         where,
@@ -29,7 +36,7 @@ router.get('/', authMiddleware, async (req, res) => {
           customer: { select: { id: true, firstName: true, lastName: true, companyName: true } },
           _count: { select: { serviceOrders: true, invoices: true } }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: parseInt(limit)
       }),
@@ -124,6 +131,29 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
     res.status(500).json({ error: 'Failed to delete contract' });
   }
+});
+
+// Bulk delete contracts
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const result = await req.prisma.contract.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${result.count} contracts deleted`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to delete contracts' }); }
+});
+
+// Bulk update contracts
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const allowedFields = ['status'];
+    const updateData = {};
+    for (const field of allowedFields) { if (data[field] !== undefined) updateData[field] = data[field]; }
+    const result = await req.prisma.contract.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${result.count} contracts updated`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to update contracts' }); }
 });
 
 // Sign contract

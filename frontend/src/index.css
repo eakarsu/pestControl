@@ -142,3 +142,17 @@
     transform: rotate(360deg);
   }
 }
+
+/* Slide-in animation for detail panels */
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

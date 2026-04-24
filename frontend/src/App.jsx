@@ -1,8 +1,10 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
@@ -46,8 +48,10 @@ function App() {
   const { user } = useAuth();
 
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* Technician Mobile App */}
       <Route
@@ -65,32 +69,35 @@ function App() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/customers/:id" element={<CustomerDetail />} />
-                <Route path="/properties" element={<Properties />} />
-                <Route path="/contracts" element={<Contracts />} />
-                <Route path="/invoices" element={<Invoices />} />
-                <Route path="/service-orders" element={<ServiceOrders />} />
-                <Route path="/service-orders/:id" element={<ServiceOrderDetail />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/technicians" element={<Technicians />} />
-                <Route path="/schedule" element={<Schedule />} />
-                <Route path="/routes" element={<RoutesPage />} />
-                <Route path="/leads" element={<Leads />} />
-                <Route path="/quotes" element={<Quotes />} />
-                <Route path="/inspections" element={<Inspections />} />
-                <Route path="/compliance" element={<Compliance />} />
-                <Route path="/ai-tools" element={<AITools />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/customers" element={<Customers />} />
+                  <Route path="/customers/:id" element={<CustomerDetail />} />
+                  <Route path="/properties" element={<Properties />} />
+                  <Route path="/contracts" element={<Contracts />} />
+                  <Route path="/invoices" element={<Invoices />} />
+                  <Route path="/service-orders" element={<ServiceOrders />} />
+                  <Route path="/service-orders/:id" element={<ServiceOrderDetail />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/technicians" element={<Technicians />} />
+                  <Route path="/schedule" element={<Schedule />} />
+                  <Route path="/routes" element={<RoutesPage />} />
+                  <Route path="/leads" element={<Leads />} />
+                  <Route path="/quotes" element={<Quotes />} />
+                  <Route path="/inspections" element={<Inspections />} />
+                  <Route path="/compliance" element={<Compliance />} />
+                  <Route path="/ai-tools" element={<AITools />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Routes>
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         }
       />
     </Routes>
+    </ErrorBoundary>
   );
 }
 

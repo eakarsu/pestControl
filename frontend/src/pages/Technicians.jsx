@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { technicianService, territoryService } from '../services/api';
-import { FiPlus, FiEdit2, FiTrash2, FiX, FiUser, FiMapPin, FiPhone } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiX, FiMapPin, FiPhone } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import RowDetailPanel, { DetailField } from '../components/RowDetailPanel';
+import { CardSkeleton } from '../components/LoadingSkeleton';
 
 const Technicians = () => {
   const [technicians, setTechnicians] = useState([]);
@@ -11,6 +14,9 @@ const Technicians = () => {
   const [selectedTech, setSelectedTech] = useState(null);
   const [formData, setFormData] = useState({ email: '', password: '', firstName: '', lastName: '', phone: '', employeeId: '', licenseNumber: '', licenseState: '', licenseExpiry: '', territoryId: '', specializations: [] });
 
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [detailTech, setDetailTech] = useState(null);
+
   useEffect(() => { loadTechnicians(); loadTerritories(); }, []);
 
   const loadTechnicians = async () => { try { setLoading(true); const response = await technicianService.getAll(); setTechnicians(response.data || []); } catch (error) { toast.error('Failed to load'); } finally { setLoading(false); } };
@@ -19,11 +25,7 @@ const Technicians = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const submitData = {
-        ...formData,
-        licenseExpiry: formData.licenseExpiry ? new Date(formData.licenseExpiry).toISOString() : undefined,
-        territoryId: formData.territoryId || undefined
-      };
+      const submitData = { ...formData, licenseExpiry: formData.licenseExpiry ? new Date(formData.licenseExpiry).toISOString() : undefined, territoryId: formData.territoryId || undefined };
       if (selectedTech) { await technicianService.update(selectedTech.id, submitData); toast.success('Technician updated'); }
       else { await technicianService.create(submitData); toast.success('Technician created'); }
       setModalOpen(false); loadTechnicians();
@@ -33,10 +35,17 @@ const Technicians = () => {
   const handleEdit = (tech) => {
     setSelectedTech(tech);
     setFormData({ firstName: tech.user?.firstName || '', lastName: tech.user?.lastName || '', phone: tech.user?.phone || '', employeeId: tech.employeeId, licenseNumber: tech.licenseNumber || '', licenseState: tech.licenseState || '', licenseExpiry: tech.licenseExpiry?.split('T')[0] || '', territoryId: tech.territoryId || '', specializations: tech.specializations || [] });
-    setModalOpen(true);
+    setModalOpen(true); setDetailTech(null);
   };
 
   const handleAdd = () => { setSelectedTech(null); setFormData({ email: '', password: '', firstName: '', lastName: '', phone: '', employeeId: '', licenseNumber: '', licenseState: '', licenseExpiry: '', territoryId: '', specializations: [] }); setModalOpen(true); };
+
+  const handleDelete = (tech) => {
+    setConfirmDialog({
+      isOpen: true, title: 'Delete Technician', message: `Delete ${tech.user?.firstName} ${tech.user?.lastName}? This will also remove their user account. This cannot be undone.`,
+      onConfirm: async () => { try { await technicianService.delete(tech.id); toast.success('Technician deleted'); setDetailTech(null); loadTechnicians(); } catch (error) { toast.error('Failed to delete'); } }
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -46,9 +55,9 @@ const Technicians = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? <div className="col-span-full flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full spinner" /></div> :
+        {loading ? <><CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton /></> :
           technicians.map((tech) => (
-            <div key={tech.id} className="card">
+            <div key={tech.id} className="card cursor-pointer hover:shadow-md transition-shadow" onClick={() => setDetailTech(tech)}>
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center"><span className="text-primary-700 font-bold text-lg">{tech.user?.firstName?.[0]}{tech.user?.lastName?.[0]}</span></div>
                 <div className="flex-1">
@@ -56,7 +65,6 @@ const Technicians = () => {
                   <p className="text-sm text-gray-500">{tech.employeeId}</p>
                   <div className="flex items-center gap-2 mt-2"><span className={`badge ${tech.isAvailable ? 'badge-green' : 'badge-gray'}`}>{tech.isAvailable ? 'Available' : 'Unavailable'}</span></div>
                 </div>
-                <button onClick={() => handleEdit(tech)} className="p-2 hover:bg-gray-100 rounded-lg"><FiEdit2 className="w-4 h-4" /></button>
               </div>
               <div className="mt-4 pt-4 border-t space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-gray-600"><FiPhone className="w-4 h-4" />{tech.user?.phone || 'No phone'}</div>
@@ -84,6 +92,30 @@ const Technicians = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} onConfirm={confirmDialog.onConfirm} title={confirmDialog.title} message={confirmDialog.message} confirmText="Delete" variant="danger" />
+
+      <RowDetailPanel isOpen={!!detailTech} onClose={() => setDetailTech(null)} title={detailTech ? `${detailTech.user?.firstName} ${detailTech.user?.lastName}` : ''} onEdit={() => handleEdit(detailTech)} onDelete={() => handleDelete(detailTech)}>
+        {detailTech && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <DetailField label="Name" value={`${detailTech.user?.firstName} ${detailTech.user?.lastName}`} />
+              <DetailField label="Email" value={detailTech.user?.email} />
+              <DetailField label="Phone" value={detailTech.user?.phone} />
+              <DetailField label="Employee ID" value={detailTech.employeeId} />
+              <DetailField label="Territory" value={detailTech.territory?.name || 'None'} />
+              <DetailField label="Available" value={detailTech.isAvailable ? 'Yes' : 'No'} />
+              <DetailField label="License #" value={detailTech.licenseNumber} />
+              <DetailField label="License State" value={detailTech.licenseState} />
+              <DetailField label="License Expiry" value={detailTech.licenseExpiry ? new Date(detailTech.licenseExpiry).toLocaleDateString() : '-'} />
+              <DetailField label="Jobs This Month" value={detailTech._count?.serviceOrders || 0} />
+            </div>
+            {detailTech.specializations?.length > 0 && (
+              <DetailField label="Specializations" value={detailTech.specializations.join(', ')} />
+            )}
+          </div>
+        )}
+      </RowDetailPanel>
     </div>
   );
 };

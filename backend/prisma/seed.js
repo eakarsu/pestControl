@@ -648,57 +648,61 @@ async function main() {
   }
   console.log(`✓ Created ${routes.length} routes`);
 
-  // ==================== SAFETY DATA SHEETS (10+) ====================
+  // ==================== SAFETY DATA SHEETS (15+) ====================
   console.log('Creating safety data sheets...');
-  for (let i = 0; i < 10; i++) {
+  const hazardClassOptions = ['Flammable', 'Toxic to aquatic life', 'Harmful if swallowed', 'Causes skin irritation', 'Causes serious eye damage', 'May cause respiratory irritation'];
+  for (let i = 0; i < 16; i++) {
     await prisma.safetyDataSheet.create({
       data: {
-        productName: products[i].name,
-        manufacturer: products[i].manufacturer || 'Unknown',
+        productName: products[i % products.length].name,
+        manufacturer: products[i % products.length].manufacturer || 'Unknown',
         revisionDate: new Date(2024, Math.floor(Math.random() * 12), 1),
-        documentUrl: `/sds/sds-${products[i].sku}.pdf`,
-        hazardClassifications: ['Flammable', 'Toxic to aquatic life'].slice(0, Math.floor(Math.random() * 2) + 1),
-        firstAidMeasures: 'If swallowed, call poison control immediately'
+        documentUrl: `/sds/sds-${products[i % products.length].sku}-${i}.pdf`,
+        hazardClassifications: hazardClassOptions.slice(0, Math.floor(Math.random() * 3) + 1),
+        firstAidMeasures: ['If swallowed, call poison control immediately', 'Rinse eyes with water for 15 minutes', 'Move to fresh air if inhaled', 'Wash skin with soap and water'][i % 4]
       }
     });
   }
-  console.log('✓ Created 10 safety data sheets');
+  console.log('✓ Created 16 safety data sheets');
 
-  // ==================== PRODUCT REGISTRATIONS (10+) ====================
+  // ==================== PRODUCT REGISTRATIONS (16+) ====================
   console.log('Creating product registrations...');
-  for (let i = 0; i < 10; i++) {
+  const regStates = ['GA', 'FL', 'SC', 'NC', 'AL', 'TN', 'VA'];
+  for (let i = 0; i < 16; i++) {
+    const st = regStates[i % regStates.length];
     await prisma.productRegistration.create({
       data: {
-        productName: products[i].name,
-        epaNumber: products[i].epaNumber || `EPA-${Math.floor(Math.random() * 99999)}`,
-        stateRegNumber: `GA-REG-${String(i + 1).padStart(5, '0')}`,
-        state: 'GA',
-        registrationDate: new Date(2024, 0, 1),
+        productName: products[i % products.length].name,
+        epaNumber: products[i % products.length].epaNumber || `EPA-${Math.floor(Math.random() * 99999)}`,
+        stateRegNumber: `${st}-REG-${String(i + 1).padStart(5, '0')}`,
+        state: st,
+        registrationDate: new Date(2024, Math.floor(i / 4), 1),
         expiryDate: new Date(2025, 11, 31),
-        status: 'ACTIVE'
+        status: i < 14 ? 'ACTIVE' : 'EXPIRED'
       }
     });
   }
-  console.log('✓ Created 10 product registrations');
+  console.log('✓ Created 16 product registrations');
 
-  // ==================== USAGE REPORTS (5+) ====================
+  // ==================== USAGE REPORTS (16+) ====================
   console.log('Creating usage reports...');
-  for (let i = 0; i < 5; i++) {
+  const reportPeriods = ['2023-Q1', '2023-Q2', '2023-Q3', '2023-Q4', '2024-Q1', '2024-Q2', '2024-Q3', '2024-Q4'];
+  for (let i = 0; i < 16; i++) {
     await prisma.usageReport.create({
       data: {
-        reportPeriod: `2024-Q${i + 1}`,
-        productName: products[i].name,
-        epaNumber: products[i].epaNumber,
+        reportPeriod: reportPeriods[i % reportPeriods.length],
+        productName: products[i % products.length].name,
+        epaNumber: products[i % products.length].epaNumber,
         totalQuantity: 50 + Math.floor(Math.random() * 100),
-        unit: products[i].unitOfMeasure,
+        unit: products[i % products.length].unitOfMeasure,
         applicationCount: 20 + Math.floor(Math.random() * 50),
-        reportedBy: admin.firstName + ' ' + admin.lastName,
-        submittedAt: i < 3 ? new Date() : null,
-        status: i < 3 ? 'SUBMITTED' : 'DRAFT'
+        reportedBy: i % 2 === 0 ? (admin.firstName + ' ' + admin.lastName) : (manager.firstName + ' ' + manager.lastName),
+        submittedAt: i < 10 ? new Date() : null,
+        status: i < 10 ? 'SUBMITTED' : 'DRAFT'
       }
     });
   }
-  console.log('✓ Created 5 usage reports');
+  console.log('✓ Created 16 usage reports');
 
   console.log('');
   console.log('🎉 Database seeding completed successfully!');
@@ -723,6 +727,10 @@ async function main() {
   console.log(`  - Pest Issues: ${pestIssues.length}`);
   console.log(`  - Follow-ups: ${followUps.length}`);
   console.log(`  - Routes: ${routes.length}`);
+  console.log('  - Safety Data Sheets: 16');
+  console.log('  - Product Registrations: 16');
+  console.log('  - Usage Reports: 16');
+  console.log('  - Communications: 15');
 }
 
 main()

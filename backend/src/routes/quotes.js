@@ -15,7 +15,7 @@ const generateQuoteNumber = () => {
 // Get all quotes
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, customerId, salesRepId } = req.query;
+    const { page = 1, limit = 20, status, customerId, salesRepId, sortBy, sortOrder } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
@@ -32,7 +32,9 @@ router.get('/', authMiddleware, async (req, res) => {
           salesRep: { include: { user: { select: { firstName: true, lastName: true } } } },
           lineItems: true
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: sortBy && ['quoteNumber', 'total', 'status', 'validUntil', 'createdAt'].includes(sortBy)
+          ? { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' }
+          : { createdAt: 'desc' },
         skip,
         take: parseInt(limit)
       }),
@@ -334,6 +336,36 @@ router.get('/meta/statuses', authMiddleware, async (req, res) => {
     { value: 'EXPIRED', label: 'Expired' }
   ];
   res.json(statuses);
+});
+
+// Bulk delete quotes
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: 'No IDs provided' });
+    await req.prisma.quoteLineItem.deleteMany({ where: { quoteId: { in: ids } } });
+    await req.prisma.quote.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${ids.length} quotes deleted` });
+  } catch (error) {
+    console.error('Bulk delete quotes error:', error);
+    res.status(500).json({ error: 'Failed to delete quotes' });
+  }
+});
+
+// Bulk update quotes
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: 'No IDs provided' });
+    const allowed = ['status'];
+    const updateData = {};
+    for (const key of allowed) { if (data[key] !== undefined) updateData[key] = data[key]; }
+    await req.prisma.quote.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${ids.length} quotes updated` });
+  } catch (error) {
+    console.error('Bulk update quotes error:', error);
+    res.status(500).json({ error: 'Failed to update quotes' });
+  }
 });
 
 module.exports = router;

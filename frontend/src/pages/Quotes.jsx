@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { quoteService, leadService, customerService, serviceTypeService } from '../services/api';
 import { useConfig } from '../context/ConfigContext';
-import { FiPlus, FiSearch, FiEdit2, FiX, FiSend, FiCheck, FiFileText, FiDollarSign } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiEdit2, FiX, FiSend, FiCheck, FiTrash2 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import SortableHeader from '../components/SortableHeader';
+import BulkActionBar from '../components/BulkActionBar';
+import RowDetailPanel, { DetailField } from '../components/RowDetailPanel';
+import { TableSkeleton } from '../components/LoadingSkeleton';
 
 const Quotes = () => {
   const { getOptions, getLabel } = useConfig();
@@ -18,27 +23,31 @@ const Quotes = () => {
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [formData, setFormData] = useState({ leadId: '', customerId: '', validUntil: '', items: [{ serviceTypeId: '', description: '', quantity: 1, unitPrice: 0 }], discount: 0, notes: '' });
 
-  useEffect(() => { loadQuotes(); loadLeads(); loadCustomers(); loadServiceTypes(); }, [search, statusFilter]);
+  const [sort, setSort] = useState({ field: null, order: null });
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [detailQuote, setDetailQuote] = useState(null);
 
-  const loadQuotes = async () => { try { setLoading(true); const response = await quoteService.getAll({ search: search || undefined, status: statusFilter || undefined }); setQuotes(response.data.quotes || []); } catch (error) { toast.error('Failed to load quotes'); } finally { setLoading(false); } };
+  useEffect(() => { loadQuotes(); loadLeads(); loadCustomers(); loadServiceTypes(); }, [search, statusFilter, sort]);
+
+  const loadQuotes = async () => {
+    try {
+      setLoading(true);
+      const params = { search: search || undefined, status: statusFilter || undefined };
+      if (sort.field) { params.sortBy = sort.field; params.sortOrder = sort.order; }
+      const response = await quoteService.getAll(params);
+      setQuotes(response.data.quotes || []); setSelectedIds(new Set());
+    } catch (error) { toast.error('Failed to load quotes'); }
+    finally { setLoading(false); }
+  };
+
   const loadLeads = async () => { try { const response = await leadService.getAll({ limit: 100 }); setLeads(response.data.leads || []); } catch (error) {} };
   const loadCustomers = async () => { try { const response = await customerService.getAll({ limit: 100 }); setCustomers(response.data.customers || []); } catch (error) {} };
   const loadServiceTypes = async () => { try { const response = await serviceTypeService.getAll(); setServiceTypes(response.data || []); } catch (error) {} };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const data = {
-      ...formData,
-      leadId: formData.leadId || undefined,
-      customerId: formData.customerId || undefined,
-      validUntil: formData.validUntil ? new Date(formData.validUntil).toISOString() : undefined,
-      items: formData.items.filter(i => i.serviceTypeId && i.unitPrice > 0).map(item => ({
-        ...item,
-        quantity: parseFloat(item.quantity) || 1,
-        unitPrice: parseFloat(item.unitPrice) || 0
-      })),
-      discount: parseFloat(formData.discount) || 0
-    };
+    const data = { ...formData, leadId: formData.leadId || undefined, customerId: formData.customerId || undefined, validUntil: formData.validUntil ? new Date(formData.validUntil).toISOString() : undefined, items: formData.items.filter(i => i.serviceTypeId && i.unitPrice > 0).map(item => ({ ...item, quantity: parseFloat(item.quantity) || 1, unitPrice: parseFloat(item.unitPrice) || 0 })), discount: parseFloat(formData.discount) || 0 };
     try {
       if (selectedQuote) { await quoteService.update(selectedQuote.id, data); toast.success('Quote updated'); }
       else { await quoteService.create(data); toast.success('Quote created'); }
@@ -52,18 +61,39 @@ const Quotes = () => {
   const handleEdit = (quote) => {
     setSelectedQuote(quote);
     setFormData({ leadId: quote.leadId || '', customerId: quote.customerId || '', validUntil: quote.validUntil?.split('T')[0] || '', items: quote.lineItems?.length ? quote.lineItems.map(i => ({ serviceTypeId: i.serviceType, description: i.description, quantity: i.quantity, unitPrice: i.unitPrice })) : [{ serviceTypeId: '', description: '', quantity: 1, unitPrice: 0 }], discount: quote.discount || 0, notes: quote.notes || '' });
-    setModalOpen(true);
+    setModalOpen(true); setDetailQuote(null);
   };
 
   const handleAdd = () => { setSelectedQuote(null); const validDate = new Date(); validDate.setDate(validDate.getDate() + 30); setFormData({ leadId: '', customerId: '', validUntil: validDate.toISOString().split('T')[0], items: [{ serviceTypeId: '', description: '', quantity: 1, unitPrice: 0 }], discount: 0, notes: '' }); setModalOpen(true); };
 
+  const handleDelete = (quote) => {
+    setConfirmDialog({
+      isOpen: true, title: 'Delete Quote', message: `Delete quote ${quote.quoteNumber}? This cannot be undone.`,
+      onConfirm: async () => { try { await quoteService.delete(quote.id); toast.success('Quote deleted'); setDetailQuote(null); loadQuotes(); } catch (error) { toast.error('Failed'); } }
+    });
+  };
+
   const addItem = () => setFormData({ ...formData, items: [...formData.items, { serviceTypeId: '', description: '', quantity: 1, unitPrice: 0 }] });
   const removeItem = (index) => setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) });
   const updateItem = (index, field, value) => { const items = [...formData.items]; items[index][field] = value; setFormData({ ...formData, items }); };
-
   const calculateTotal = () => { const subtotal = formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0); return subtotal - (formData.discount || 0); };
 
   const getStatusBadge = (status) => { const colors = { DRAFT: 'badge-gray', SENT: 'badge-blue', VIEWED: 'badge-yellow', ACCEPTED: 'badge-green', REJECTED: 'badge-red', EXPIRED: 'badge-gray' }; return colors[status] || 'badge-gray'; };
+
+  const toggleSelect = (id) => { const next = new Set(selectedIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedIds(next); };
+  const toggleSelectAll = () => { selectedIds.size === quotes.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(quotes.map(q => q.id))); };
+
+  const handleBulkDelete = () => {
+    setConfirmDialog({
+      isOpen: true, title: 'Delete Selected Quotes', message: `Delete ${selectedIds.size} quote(s)? This cannot be undone.`,
+      onConfirm: async () => { try { await quoteService.bulkDelete([...selectedIds]); toast.success(`${selectedIds.size} quotes deleted`); setSelectedIds(new Set()); loadQuotes(); } catch (error) { toast.error('Failed'); } }
+    });
+  };
+
+  const handleBulkUpdate = async (data) => {
+    try { await quoteService.bulkUpdate([...selectedIds], data); toast.success(`${selectedIds.size} quotes updated`); setSelectedIds(new Set()); loadQuotes(); }
+    catch (error) { toast.error('Failed'); }
+  };
 
   return (
     <div className="space-y-6">
@@ -77,25 +107,37 @@ const Quotes = () => {
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="select"><option value="">All Statuses</option>{quoteStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
       </div></div>
 
-      <div className="card p-0 overflow-hidden">
-        {loading ? <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full spinner" /></div> : (
-          <div className="table-container"><table className="table"><thead><tr><th>Quote #</th><th>Customer/Lead</th><th>Total</th><th>Valid Until</th><th>Status</th><th>Actions</th></tr></thead>
+      <BulkActionBar selectedCount={selectedIds.size} onBulkDelete={handleBulkDelete} onBulkUpdate={handleBulkUpdate} onClearSelection={() => setSelectedIds(new Set())} statusOptions={quoteStatuses} />
+
+      {loading ? <TableSkeleton rows={8} cols={7} /> : (
+        <div className="card p-0 overflow-hidden">
+          <div className="table-container"><table className="table"><thead><tr>
+            <th className="w-10"><input type="checkbox" checked={selectedIds.size === quotes.length && quotes.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300" /></th>
+            <SortableHeader label="Quote #" field="quoteNumber" currentSort={sort} onSort={setSort} />
+            <th>Customer/Lead</th>
+            <SortableHeader label="Total" field="total" currentSort={sort} onSort={setSort} />
+            <SortableHeader label="Valid Until" field="validUntil" currentSort={sort} onSort={setSort} />
+            <SortableHeader label="Status" field="status" currentSort={sort} onSort={setSort} />
+            <th>Actions</th>
+          </tr></thead>
             <tbody className="divide-y divide-gray-200">{quotes.map((quote) => (
-              <tr key={quote.id}>
+              <tr key={quote.id} className={`cursor-pointer ${selectedIds.has(quote.id) ? 'bg-primary-50' : ''}`} onClick={() => setDetailQuote(quote)}>
+                <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(quote.id)} onChange={() => toggleSelect(quote.id)} className="rounded border-gray-300" /></td>
                 <td className="font-mono">{quote.quoteNumber}</td>
                 <td>{quote.customer ? `${quote.customer.firstName} ${quote.customer.lastName}` : quote.lead ? `${quote.lead.firstName} ${quote.lead.lastName}` : '-'}</td>
                 <td className="font-semibold">${quote.total?.toLocaleString()}</td>
                 <td>{quote.validUntil ? new Date(quote.validUntil).toLocaleDateString() : '-'}</td>
                 <td><span className={`badge ${getStatusBadge(quote.status)}`}>{getLabel('quoteStatuses', quote.status)}</span></td>
-                <td><div className="flex gap-2">
+                <td onClick={(e) => e.stopPropagation()}><div className="flex gap-2">
                   <button onClick={() => handleEdit(quote)} className="p-2 hover:bg-gray-100 rounded-lg"><FiEdit2 className="w-4 h-4" /></button>
                   {quote.status === 'DRAFT' && <button onClick={() => handleSend(quote)} className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg" title="Send Quote"><FiSend className="w-4 h-4" /></button>}
                   {(quote.status === 'SENT' || quote.status === 'VIEWED') && <button onClick={() => handleAccept(quote)} className="p-2 hover:bg-green-100 text-green-600 rounded-lg" title="Mark Accepted"><FiCheck className="w-4 h-4" /></button>}
+                  <button onClick={() => handleDelete(quote)} className="p-2 hover:bg-red-100 text-red-600 rounded-lg"><FiTrash2 className="w-4 h-4" /></button>
                 </div></td>
               </tr>
             ))}</tbody></table></div>
-        )}
-      </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -107,7 +149,6 @@ const Quotes = () => {
                 <div><label className="label">Or Customer</label><select value={formData.customerId} onChange={(e) => setFormData({ ...formData, customerId: e.target.value, leadId: '' })} className="select"><option value="">Select Customer</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}</select></div>
               </div>
               <div><label className="label">Valid Until</label><input type="date" value={formData.validUntil} onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })} className="input" /></div>
-
               <div className="border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4"><h3 className="font-semibold">Line Items</h3><button type="button" onClick={addItem} className="btn btn-secondary btn-sm">Add Item</button></div>
                 {formData.items.map((item, index) => (
@@ -124,13 +165,44 @@ const Quotes = () => {
                   <div className="text-right"><p className="text-sm text-gray-500">Total</p><p className="text-2xl font-bold">${calculateTotal().toFixed(2)}</p></div>
                 </div>
               </div>
-
               <div><label className="label">Notes</label><textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="input" rows={2} /></div>
               <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">Cancel</button><button type="submit" className="btn btn-primary">{selectedQuote ? 'Update' : 'Create'}</button></div>
             </form>
           </div>
         </div>
       )}
+
+      <ConfirmDialog isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} onConfirm={confirmDialog.onConfirm} title={confirmDialog.title} message={confirmDialog.message} confirmText="Confirm" variant="danger" />
+
+      <RowDetailPanel isOpen={!!detailQuote} onClose={() => setDetailQuote(null)} title={detailQuote?.quoteNumber || ''} onEdit={() => handleEdit(detailQuote)} onDelete={() => handleDelete(detailQuote)}>
+        {detailQuote && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <DetailField label="Quote #" value={detailQuote.quoteNumber} />
+              <DetailField label="Customer" value={detailQuote.customer ? `${detailQuote.customer.firstName} ${detailQuote.customer.lastName}` : '-'} />
+              <DetailField label="Lead" value={detailQuote.lead ? `${detailQuote.lead.firstName} ${detailQuote.lead.lastName}` : '-'} />
+              <DetailField label="Status" value={getLabel('quoteStatuses', detailQuote.status)} />
+              <DetailField label="Subtotal" value={`$${detailQuote.subtotal?.toLocaleString()}`} />
+              <DetailField label="Discount" value={`$${detailQuote.discount?.toLocaleString()}`} />
+              <DetailField label="Total" value={`$${detailQuote.total?.toLocaleString()}`} />
+              <DetailField label="Valid Until" value={detailQuote.validUntil ? new Date(detailQuote.validUntil).toLocaleDateString() : '-'} />
+              <DetailField label="Created" value={new Date(detailQuote.createdAt).toLocaleDateString()} />
+            </div>
+            {detailQuote.lineItems?.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Line Items</h4>
+                <div className="space-y-2">{detailQuote.lineItems.map((item, i) => (
+                  <div key={i} className="flex justify-between text-sm bg-gray-50 p-2 rounded">
+                    <span>{item.description || item.serviceType}</span>
+                    <span>${item.total?.toFixed(2)}</span>
+                  </div>
+                ))}</div>
+              </div>
+            )}
+            <DetailField label="Notes" value={detailQuote.notes} />
+          </div>
+        )}
+      </RowDetailPanel>
     </div>
   );
 };

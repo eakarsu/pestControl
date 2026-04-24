@@ -22,10 +22,17 @@ router.get('/', authMiddleware, async (req, res) => {
       where.inStock = { lte: req.prisma.product.fields.reorderLevel };
     }
 
+    // Sorting support
+    const { sortBy, sortOrder = 'asc' } = req.query;
+    const validSortFields = ['name', 'sku', 'category', 'unitCost', 'inStock', 'createdAt'];
+    const orderBy = validSortFields.includes(sortBy)
+      ? { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' }
+      : { name: 'asc' };
+
     const [products, total] = await Promise.all([
       req.prisma.product.findMany({
         where,
-        orderBy: { name: 'asc' },
+        orderBy,
         skip,
         take: parseInt(limit)
       }),
@@ -125,6 +132,29 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     console.error('Delete product error:', error);
     res.status(500).json({ error: 'Failed to delete product' });
   }
+});
+
+// Bulk delete products
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const result = await req.prisma.product.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${result.count} products deleted`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to delete products' }); }
+});
+
+// Bulk update products
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const allowedFields = ['category', 'isRestricted'];
+    const updateData = {};
+    for (const field of allowedFields) { if (data[field] !== undefined) updateData[field] = data[field]; }
+    const result = await req.prisma.product.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${result.count} products updated`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to update products' }); }
 });
 
 // Adjust inventory

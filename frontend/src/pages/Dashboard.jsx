@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { dashboardService } from '../services/api';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { FiUsers, FiHome, FiDollarSign, FiCalendar, FiAlertTriangle, FiCheckCircle, FiClock, FiTrendingUp } from 'react-icons/fi';
+import { StatCardSkeleton } from '../components/LoadingSkeleton';
 import toast from 'react-hot-toast';
 
-const StatCard = ({ icon: Icon, label, value, change, color }) => (
-  <div className="stat-card">
+const StatCard = ({ icon: Icon, label, value, change, color, onClick }) => (
+  <div className="stat-card cursor-pointer hover:shadow-md hover:border-primary-200 transition-all" onClick={onClick}>
     <div className="flex items-center justify-between">
       <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
         <Icon className="w-6 h-6 text-white" />
@@ -25,6 +26,7 @@ const StatCard = ({ icon: Icon, label, value, change, color }) => (
 );
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [scheduleToday, setScheduleToday] = useState(null);
   const [activity, setActivity] = useState([]);
@@ -63,8 +65,14 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full spinner" />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-8 w-32 bg-gray-200 animate-pulse rounded" />
+          <div className="h-5 w-48 bg-gray-200 animate-pulse rounded" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1,2,3,4].map(i => <StatCardSkeleton key={i} />)}
+        </div>
       </div>
     );
   }
@@ -83,12 +91,14 @@ const Dashboard = () => {
           label="Active Customers"
           value={stats?.customers?.active || 0}
           color="bg-blue-500"
+          onClick={() => navigate('/customers')}
         />
         <StatCard
           icon={FiCalendar}
           label="Today's Jobs"
           value={stats?.serviceOrders?.scheduledToday || 0}
           color="bg-green-500"
+          onClick={() => navigate('/service-orders')}
         />
         <StatCard
           icon={FiDollarSign}
@@ -96,12 +106,14 @@ const Dashboard = () => {
           value={`$${(stats?.revenue?.thisMonth || 0).toLocaleString()}`}
           change={stats?.revenue?.changePercent}
           color="bg-purple-500"
+          onClick={() => navigate('/invoices')}
         />
         <StatCard
           icon={FiAlertTriangle}
           label="Overdue Invoices"
           value={stats?.invoices?.overdue || 0}
           color="bg-red-500"
+          onClick={() => navigate('/invoices')}
         />
       </div>
 
@@ -279,19 +291,19 @@ const Dashboard = () => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card text-center">
+        <div className="card text-center cursor-pointer hover:shadow-md hover:border-primary-200 transition-all" onClick={() => navigate('/properties')}>
           <p className="text-3xl font-bold text-gray-900">{stats?.properties || 0}</p>
           <p className="text-sm text-gray-500">Total Properties</p>
         </div>
-        <div className="card text-center">
+        <div className="card text-center cursor-pointer hover:shadow-md hover:border-primary-200 transition-all" onClick={() => navigate('/contracts')}>
           <p className="text-3xl font-bold text-gray-900">{stats?.contracts?.active || 0}</p>
           <p className="text-sm text-gray-500">Active Contracts</p>
         </div>
-        <div className="card text-center">
+        <div className="card text-center cursor-pointer hover:shadow-md hover:border-primary-200 transition-all" onClick={() => navigate('/leads')}>
           <p className="text-3xl font-bold text-gray-900">{stats?.leads?.pending || 0}</p>
           <p className="text-sm text-gray-500">Pending Leads</p>
         </div>
-        <div className="card text-center">
+        <div className="card text-center cursor-pointer hover:shadow-md hover:border-primary-200 transition-all" onClick={() => navigate('/service-orders')}>
           <p className="text-3xl font-bold text-gray-900">{stats?.serviceOrders?.completedToday || 0}</p>
           <p className="text-sm text-gray-500">Completed Today</p>
         </div>

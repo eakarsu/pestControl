@@ -6,7 +6,7 @@ const router = express.Router();
 // Get all properties
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, customerId, type } = req.query;
+    const { page = 1, limit = 20, search, customerId, type, sortBy, sortOrder } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
@@ -27,7 +27,9 @@ router.get('/', authMiddleware, async (req, res) => {
           customer: { select: { id: true, firstName: true, lastName: true, companyName: true } },
           _count: { select: { pestIssues: true, services: true } }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: sortBy && ['name', 'addressLine1', 'city', 'propertyType', 'createdAt'].includes(sortBy)
+          ? { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' }
+          : { createdAt: 'desc' },
         skip,
         take: parseInt(limit)
       }),
@@ -171,6 +173,35 @@ router.get('/meta/types', authMiddleware, async (req, res) => {
     { value: 'OTHER', label: 'Other' }
   ];
   res.json(types);
+});
+
+// Bulk delete properties
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: 'No IDs provided' });
+    await req.prisma.property.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${ids.length} properties deleted` });
+  } catch (error) {
+    console.error('Bulk delete properties error:', error);
+    res.status(500).json({ error: 'Failed to delete properties' });
+  }
+});
+
+// Bulk update properties
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: 'No IDs provided' });
+    const allowed = ['propertyType'];
+    const updateData = {};
+    for (const key of allowed) { if (data[key] !== undefined) updateData[key] = data[key]; }
+    await req.prisma.property.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${ids.length} properties updated` });
+  } catch (error) {
+    console.error('Bulk update properties error:', error);
+    res.status(500).json({ error: 'Failed to update properties' });
+  }
 });
 
 module.exports = router;

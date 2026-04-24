@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { invoiceService, customerService } from '../services/api';
 import { useConfig } from '../context/ConfigContext';
-import { FiPlus, FiSearch, FiEdit2, FiDollarSign, FiX, FiSend } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiEdit2, FiDollarSign, FiX, FiSend, FiTrash2 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import SortableHeader from '../components/SortableHeader';
+import BulkActionBar from '../components/BulkActionBar';
+import RowDetailPanel, { DetailField } from '../components/RowDetailPanel';
+import { TableSkeleton } from '../components/LoadingSkeleton';
 
 const Invoices = () => {
   const { getOptions, getLabel } = useConfig();
@@ -20,11 +25,22 @@ const Invoices = () => {
   const [formData, setFormData] = useState({ customerId: '', dueDate: '', tax: 0, notes: '', lineItems: [{ description: '', quantity: 1, unitPrice: 0 }] });
   const [paymentData, setPaymentData] = useState({ amount: 0, paymentMethod: 'CREDIT_CARD', notes: '' });
 
-  useEffect(() => { loadInvoices(); loadCustomers(); }, [page, statusFilter]);
+  const [sort, setSort] = useState({ field: null, order: null });
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [detailInvoice, setDetailInvoice] = useState(null);
+
+  useEffect(() => { loadInvoices(); loadCustomers(); }, [page, statusFilter, sort]);
 
   const loadInvoices = async () => {
-    try { setLoading(true); const response = await invoiceService.getAll({ page, limit: 20, status: statusFilter || undefined }); setInvoices(response.data.invoices); setPagination(response.data.pagination); }
-    catch (error) { toast.error('Failed to load invoices'); } finally { setLoading(false); }
+    try {
+      setLoading(true);
+      const params = { page, limit: 20, status: statusFilter || undefined };
+      if (sort.field) { params.sortBy = sort.field; params.sortOrder = sort.order; }
+      const response = await invoiceService.getAll(params);
+      setInvoices(response.data.invoices); setPagination(response.data.pagination); setSelectedIds(new Set());
+    } catch (error) { toast.error('Failed to load invoices'); }
+    finally { setLoading(false); }
   };
 
   const loadCustomers = async () => { try { const response = await customerService.getAll({ limit: 100 }); setCustomers(response.data.customers || []); } catch (error) {} };
@@ -32,20 +48,8 @@ const Invoices = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const submitData = {
-        ...formData,
-        tax: parseFloat(formData.tax) || 0,
-        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
-        lineItems: formData.lineItems.map(item => ({
-          ...item,
-          quantity: parseFloat(item.quantity) || 1,
-          unitPrice: parseFloat(item.unitPrice) || 0
-        }))
-      };
-      await invoiceService.create(submitData);
-      toast.success('Invoice created');
-      setModalOpen(false);
-      loadInvoices();
+      const submitData = { ...formData, tax: parseFloat(formData.tax) || 0, dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined, lineItems: formData.lineItems.map(item => ({ ...item, quantity: parseFloat(item.quantity) || 1, unitPrice: parseFloat(item.unitPrice) || 0 })) };
+      await invoiceService.create(submitData); toast.success('Invoice created'); setModalOpen(false); loadInvoices();
     } catch (error) { toast.error('Failed to create invoice'); }
   };
 
@@ -55,15 +59,34 @@ const Invoices = () => {
     catch (error) { toast.error('Failed to record payment'); }
   };
 
-  const handleSend = async (invoice) => {
-    try { await invoiceService.send(invoice.id); toast.success('Invoice sent'); loadInvoices(); } catch (error) { toast.error('Failed to send'); }
-  };
-
+  const handleSend = async (invoice) => { try { await invoiceService.send(invoice.id); toast.success('Invoice sent'); loadInvoices(); } catch (error) { toast.error('Failed to send'); } };
   const openPaymentModal = (invoice) => { setSelectedInvoice(invoice); setPaymentData({ amount: invoice.total - invoice.amountPaid, paymentMethod: 'CREDIT_CARD', notes: '' }); setPaymentModalOpen(true); };
+
+  const handleDelete = (invoice) => {
+    setConfirmDialog({
+      isOpen: true, title: 'Delete Invoice', message: `Delete invoice ${invoice.invoiceNumber}? This cannot be undone.`,
+      onConfirm: async () => { try { await invoiceService.delete(invoice.id); toast.success('Invoice deleted'); setDetailInvoice(null); loadInvoices(); } catch (error) { toast.error('Failed'); } }
+    });
+  };
 
   const addLineItem = () => setFormData({ ...formData, lineItems: [...formData.lineItems, { description: '', quantity: 1, unitPrice: 0 }] });
   const updateLineItem = (index, field, value) => { const items = [...formData.lineItems]; items[index][field] = value; setFormData({ ...formData, lineItems: items }); };
   const removeLineItem = (index) => setFormData({ ...formData, lineItems: formData.lineItems.filter((_, i) => i !== index) });
+
+  const toggleSelect = (id) => { const next = new Set(selectedIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedIds(next); };
+  const toggleSelectAll = () => { selectedIds.size === invoices.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(invoices.map(i => i.id))); };
+
+  const handleBulkDelete = () => {
+    setConfirmDialog({
+      isOpen: true, title: 'Delete Selected Invoices', message: `Delete ${selectedIds.size} invoice(s)?`,
+      onConfirm: async () => { try { await invoiceService.bulkDelete([...selectedIds]); toast.success(`${selectedIds.size} invoices deleted`); setSelectedIds(new Set()); loadInvoices(); } catch (error) { toast.error('Failed'); } }
+    });
+  };
+
+  const handleBulkUpdate = async (data) => {
+    try { await invoiceService.bulkUpdate([...selectedIds], data); toast.success(`${selectedIds.size} invoices updated`); setSelectedIds(new Set()); loadInvoices(); }
+    catch (error) { toast.error('Failed'); }
+  };
 
   return (
     <div className="space-y-6">
@@ -77,26 +100,48 @@ const Invoices = () => {
         {invoiceStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
       </select></div>
 
-      <div className="card p-0 overflow-hidden">
-        {loading ? <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full spinner" /></div> : (
-          <div className="table-container"><table className="table"><thead><tr><th>Invoice #</th><th>Customer</th><th>Date</th><th>Amount</th><th>Paid</th><th>Status</th><th>Actions</th></tr></thead>
+      <BulkActionBar selectedCount={selectedIds.size} onBulkDelete={handleBulkDelete} onBulkUpdate={handleBulkUpdate} onClearSelection={() => setSelectedIds(new Set())} statusOptions={invoiceStatuses} />
+
+      {loading ? <TableSkeleton rows={8} cols={8} /> : (
+        <div className="card p-0 overflow-hidden">
+          <div className="table-container"><table className="table"><thead><tr>
+            <th className="w-10"><input type="checkbox" checked={selectedIds.size === invoices.length && invoices.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300" /></th>
+            <SortableHeader label="Invoice #" field="invoiceNumber" currentSort={sort} onSort={setSort} />
+            <th>Customer</th>
+            <SortableHeader label="Date" field="issueDate" currentSort={sort} onSort={setSort} />
+            <SortableHeader label="Amount" field="total" currentSort={sort} onSort={setSort} />
+            <th>Paid</th>
+            <SortableHeader label="Status" field="status" currentSort={sort} onSort={setSort} />
+            <th>Actions</th>
+          </tr></thead>
             <tbody className="divide-y divide-gray-200">{invoices.map((invoice) => (
-              <tr key={invoice.id}>
+              <tr key={invoice.id} className={`cursor-pointer ${selectedIds.has(invoice.id) ? 'bg-primary-50' : ''}`} onClick={() => setDetailInvoice(invoice)}>
+                <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(invoice.id)} onChange={() => toggleSelect(invoice.id)} className="rounded border-gray-300" /></td>
                 <td className="font-medium">{invoice.invoiceNumber}</td>
                 <td>{invoice.customer?.firstName} {invoice.customer?.lastName}</td>
                 <td>{new Date(invoice.issueDate).toLocaleDateString()}</td>
                 <td>${invoice.total?.toLocaleString()}</td>
                 <td>${invoice.amountPaid?.toLocaleString()}</td>
                 <td><span className={`badge ${invoice.status === 'PAID' ? 'badge-green' : invoice.status === 'OVERDUE' ? 'badge-red' : 'badge-yellow'}`}>{getLabel('invoiceStatuses', invoice.status)}</span></td>
-                <td><div className="flex gap-2">
+                <td onClick={(e) => e.stopPropagation()}><div className="flex gap-2">
                   {invoice.status !== 'PAID' && <button onClick={() => openPaymentModal(invoice)} className="p-2 hover:bg-gray-100 rounded-lg" title="Record Payment"><FiDollarSign className="w-4 h-4" /></button>}
                   {invoice.status === 'PENDING' && <button onClick={() => handleSend(invoice)} className="p-2 hover:bg-gray-100 rounded-lg" title="Send"><FiSend className="w-4 h-4" /></button>}
+                  <button onClick={() => handleDelete(invoice)} className="p-2 hover:bg-red-100 text-red-600 rounded-lg"><FiTrash2 className="w-4 h-4" /></button>
                 </div></td>
               </tr>
             ))}</tbody></table></div>
-        )}
-      </div>
+        </div>
+      )}
 
+      {pagination && pagination.pages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button onClick={() => setPage(page - 1)} disabled={page === 1} className="btn btn-secondary">Previous</button>
+          <span className="text-sm text-gray-500">Page {page} of {pagination.pages}</span>
+          <button onClick={() => setPage(page + 1)} disabled={page === pagination.pages} className="btn btn-secondary">Next</button>
+        </div>
+      )}
+
+      {/* Create Invoice Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -120,6 +165,7 @@ const Invoices = () => {
         </div>
       )}
 
+      {/* Payment Modal */}
       {paymentModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
@@ -132,6 +178,39 @@ const Invoices = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog isOpen={confirmDialog.isOpen} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} onConfirm={confirmDialog.onConfirm} title={confirmDialog.title} message={confirmDialog.message} confirmText="Confirm" variant="danger" />
+
+      <RowDetailPanel isOpen={!!detailInvoice} onClose={() => setDetailInvoice(null)} title={detailInvoice?.invoiceNumber || ''} onDelete={() => handleDelete(detailInvoice)}>
+        {detailInvoice && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <DetailField label="Invoice #" value={detailInvoice.invoiceNumber} />
+              <DetailField label="Customer" value={`${detailInvoice.customer?.firstName} ${detailInvoice.customer?.lastName}`} />
+              <DetailField label="Issue Date" value={new Date(detailInvoice.issueDate).toLocaleDateString()} />
+              <DetailField label="Due Date" value={new Date(detailInvoice.dueDate).toLocaleDateString()} />
+              <DetailField label="Subtotal" value={`$${detailInvoice.subtotal?.toLocaleString()}`} />
+              <DetailField label="Tax" value={`$${detailInvoice.tax?.toLocaleString()}`} />
+              <DetailField label="Total" value={`$${detailInvoice.total?.toLocaleString()}`} />
+              <DetailField label="Amount Paid" value={`$${detailInvoice.amountPaid?.toLocaleString()}`} />
+              <DetailField label="Status" value={getLabel('invoiceStatuses', detailInvoice.status)} />
+            </div>
+            {detailInvoice.lineItems?.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Line Items</h4>
+                <div className="space-y-2">
+                  {detailInvoice.lineItems.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm bg-gray-50 p-2 rounded">
+                      <span>{item.description}</span>
+                      <span>${item.total?.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </RowDetailPanel>
     </div>
   );
 };

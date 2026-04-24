@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { serviceOrderService, technicianService, serviceService, propertyService } from '../services/api';
 import { useConfig } from '../context/ConfigContext';
-import { FiPlus, FiSearch, FiEye, FiEdit2, FiClock, FiCheckCircle, FiX, FiCalendar } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiEye, FiEdit2, FiTrash2, FiClock, FiCheckCircle, FiX, FiCalendar } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import SortableHeader from '../components/SortableHeader';
+import BulkActionBar from '../components/BulkActionBar';
+import RowDetailPanel, { DetailField } from '../components/RowDetailPanel';
+import { TableSkeleton } from '../components/LoadingSkeleton';
 
 const ServiceOrderModal = ({ isOpen, onClose, order, onSave, priorities }) => {
   const [formData, setFormData] = useState({
@@ -233,21 +238,36 @@ const ServiceOrders = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
+  // Sort state
+  const [sort, setSort] = useState({ field: null, order: null });
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  // Confirm dialog
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+  // Row detail panel
+  const [detailOrder, setDetailOrder] = useState(null);
+
   useEffect(() => {
     loadOrders();
-  }, [page, statusFilter, dateFilter]);
+  }, [page, statusFilter, dateFilter, sort]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const response = await serviceOrderService.getAll({
+      const params = {
         page,
         limit: 20,
         status: statusFilter || undefined,
         date: dateFilter || undefined
-      });
+      };
+      if (sort.field) { params.sortBy = sort.field; params.sortOrder = sort.order; }
+      const response = await serviceOrderService.getAll(params);
       setOrders(response.data.serviceOrders);
       setPagination(response.data.pagination);
+      setSelectedIds(new Set());
     } catch (error) {
       toast.error('Failed to load service orders');
     } finally {
@@ -268,14 +288,91 @@ const ServiceOrders = () => {
     return classes[status] || 'badge-gray';
   };
 
+  const getPriorityBadge = (priority) => {
+    const classes = {
+      LOW: 'badge-gray',
+      NORMAL: 'badge-blue',
+      HIGH: 'badge-yellow',
+      URGENT: 'badge-red'
+    };
+    return classes[priority] || 'badge-gray';
+  };
+
+  const handleDelete = (order) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Service Order',
+      message: `Are you sure you want to delete service order "${order.orderNumber}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await serviceOrderService.delete(order.id);
+          toast.success('Service order deleted successfully');
+          setDetailOrder(null);
+          loadOrders();
+        } catch (error) {
+          toast.error('Failed to delete service order');
+        }
+      }
+    });
+  };
+
   const handleEdit = (order) => {
     setSelectedOrder(order);
     setModalOpen(true);
+    setDetailOrder(null);
   };
 
   const handleAdd = () => {
     setSelectedOrder(null);
     setModalOpen(true);
+  };
+
+  // Bulk operations
+  const toggleSelect = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === orders.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(orders.map(o => o.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Selected Service Orders',
+      message: `Are you sure you want to delete ${selectedIds.size} service order(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await serviceOrderService.bulkDelete([...selectedIds]);
+          toast.success(`${selectedIds.size} service orders deleted`);
+          setSelectedIds(new Set());
+          loadOrders();
+        } catch (error) {
+          toast.error('Failed to delete service orders');
+        }
+      }
+    });
+  };
+
+  const handleBulkUpdate = async (data) => {
+    try {
+      await serviceOrderService.bulkUpdate([...selectedIds], data);
+      toast.success(`${selectedIds.size} service orders updated`);
+      setSelectedIds(new Set());
+      loadOrders();
+    } catch (error) {
+      toast.error('Failed to update service orders');
+    }
+  };
+
+  const handleRowClick = (order) => {
+    setDetailOrder(order);
   };
 
   return (
@@ -323,33 +420,43 @@ const ServiceOrders = () => {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onBulkDelete={handleBulkDelete}
+        onBulkUpdate={handleBulkUpdate}
+        onClearSelection={() => setSelectedIds(new Set())}
+        statusOptions={serviceOrderStatuses}
+      />
+
       {/* Table */}
-      <div className="card p-0 overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full spinner" />
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No service orders found</p>
-          </div>
-        ) : (
+      {loading ? <TableSkeleton rows={8} cols={8} /> : orders.length === 0 ? (
+        <div className="card"><div className="text-center py-12"><p className="text-gray-500">No service orders found</p></div></div>
+      ) : (
+        <div className="card p-0 overflow-hidden">
           <div className="table-container">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Order #</th>
+                  <th className="w-10">
+                    <input type="checkbox" checked={selectedIds.size === orders.length && orders.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300" />
+                  </th>
+                  <SortableHeader label="Order #" field="orderNumber" currentSort={sort} onSort={setSort} />
                   <th>Customer</th>
                   <th>Service</th>
                   <th>Technician</th>
-                  <th>Scheduled</th>
-                  <th>Status</th>
+                  <SortableHeader label="Scheduled" field="scheduledDate" currentSort={sort} onSort={setSort} />
+                  <SortableHeader label="Status" field="status" currentSort={sort} onSort={setSort} />
+                  <SortableHeader label="Priority" field="priority" currentSort={sort} onSort={setSort} />
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {orders.map((order) => (
-                  <tr key={order.id}>
+                  <tr key={order.id} className={`cursor-pointer ${selectedIds.has(order.id) ? 'bg-primary-50' : ''}`} onClick={() => handleRowClick(order)}>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => toggleSelect(order.id)} className="rounded border-gray-300" />
+                    </td>
                     <td className="font-medium">{order.orderNumber}</td>
                     <td>
                       <div>
@@ -381,18 +488,32 @@ const ServiceOrders = () => {
                       </span>
                     </td>
                     <td>
+                      <span className={`badge ${getPriorityBadge(order.priority)}`}>
+                        {getLabel('priorities', order.priority)}
+                      </span>
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
                         <Link
                           to={`/service-orders/${order.id}`}
                           className="p-2 hover:bg-gray-100 rounded-lg"
+                          title="View"
                         >
                           <FiEye className="w-4 h-4" />
                         </Link>
                         <button
                           onClick={() => handleEdit(order)}
                           className="p-2 hover:bg-gray-100 rounded-lg"
+                          title="Edit"
                         >
                           <FiEdit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(order)}
+                          className="p-2 hover:bg-red-100 text-red-600 rounded-lg"
+                          title="Delete"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -401,8 +522,8 @@ const ServiceOrders = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Pagination */}
       {pagination && pagination.pages > 1 && (
@@ -425,6 +546,7 @@ const ServiceOrders = () => {
         </div>
       )}
 
+      {/* Service Order Modal */}
       <ServiceOrderModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -432,6 +554,46 @@ const ServiceOrders = () => {
         onSave={loadOrders}
         priorities={priorities}
       />
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+        variant="danger"
+      />
+
+      {/* Row Detail Panel */}
+      <RowDetailPanel
+        isOpen={!!detailOrder}
+        onClose={() => setDetailOrder(null)}
+        title={detailOrder ? `Service Order ${detailOrder.orderNumber}` : ''}
+        onEdit={() => handleEdit(detailOrder)}
+        onDelete={() => handleDelete(detailOrder)}
+      >
+        {detailOrder && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <DetailField label="Order Number" value={detailOrder.orderNumber} />
+              <DetailField label="Status" value={getLabel('serviceOrderStatuses', detailOrder.status)} />
+              <DetailField label="Priority" value={getLabel('priorities', detailOrder.priority)} />
+              <DetailField label="Scheduled Date" value={detailOrder.scheduledDate ? new Date(detailOrder.scheduledDate).toLocaleDateString() : ''} />
+              <DetailField label="Start Time" value={detailOrder.scheduledTimeStart} />
+              <DetailField label="End Time" value={detailOrder.scheduledTimeEnd} />
+              <DetailField label="Customer" value={detailOrder.property?.customer ? `${detailOrder.property.customer.firstName} ${detailOrder.property.customer.lastName}` : ''} />
+              <DetailField label="Property" value={detailOrder.property?.addressLine1} />
+            </div>
+            <DetailField label="Service Type" value={detailOrder.serviceType?.name} />
+            <DetailField label="Technician" value={detailOrder.technician ? `${detailOrder.technician.user?.firstName} ${detailOrder.technician.user?.lastName}` : 'Unassigned'} />
+            <DetailField label="Customer Notes" value={detailOrder.customerNotes} />
+            <DetailField label="Technician Notes" value={detailOrder.technicianNotes} />
+            <DetailField label="Created" value={new Date(detailOrder.createdAt).toLocaleDateString()} />
+          </div>
+        )}
+      </RowDetailPanel>
     </div>
   );
 };

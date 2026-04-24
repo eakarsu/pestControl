@@ -6,7 +6,7 @@ const router = express.Router();
 // Get all customers with pagination and search
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, status, type } = req.query;
+    const { page = 1, limit = 20, search, status, type, sortBy, sortOrder = 'desc' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
@@ -21,6 +21,12 @@ router.get('/', authMiddleware, async (req, res) => {
     if (status) where.status = status;
     if (type) where.customerType = type;
 
+    // Sorting support
+    const validSortFields = ['firstName', 'lastName', 'email', 'customerType', 'status', 'createdAt'];
+    const orderBy = validSortFields.includes(sortBy)
+      ? { [sortBy]: sortOrder === 'asc' ? 'asc' : 'desc' }
+      : { createdAt: 'desc' };
+
     const [customers, total] = await Promise.all([
       req.prisma.customer.findMany({
         where,
@@ -28,7 +34,7 @@ router.get('/', authMiddleware, async (req, res) => {
           properties: { select: { id: true, name: true, city: true } },
           _count: { select: { contracts: true, invoices: true } }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: parseInt(limit)
       }),
@@ -125,6 +131,41 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
     res.status(500).json({ error: 'Failed to delete customer' });
+  }
+});
+
+// Bulk delete customers
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No IDs provided' });
+    }
+    const result = await req.prisma.customer.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${result.count} customers deleted successfully`, count: result.count });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    res.status(500).json({ error: 'Failed to delete customers' });
+  }
+});
+
+// Bulk update customers
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No IDs provided' });
+    }
+    const allowedFields = ['status', 'customerType'];
+    const updateData = {};
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) updateData[field] = data[field];
+    }
+    const result = await req.prisma.customer.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${result.count} customers updated successfully`, count: result.count });
+  } catch (error) {
+    console.error('Bulk update error:', error);
+    res.status(500).json({ error: 'Failed to update customers' });
   }
 });
 

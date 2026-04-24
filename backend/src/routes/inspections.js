@@ -6,7 +6,7 @@ const router = express.Router();
 // Get all inspections
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, inspectorId, startDate, endDate } = req.query;
+    const { page = 1, limit = 20, status, inspectorId, startDate, endDate, sortBy, sortOrder } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
@@ -25,7 +25,9 @@ router.get('/', authMiddleware, async (req, res) => {
           lead: { select: { firstName: true, lastName: true, phone: true } },
           property: { include: { customer: { select: { firstName: true, lastName: true } } } }
         },
-        orderBy: { scheduledDate: 'desc' },
+        orderBy: sortBy && ['scheduledDate', 'status', 'createdAt'].includes(sortBy)
+          ? { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' }
+          : { scheduledDate: 'desc' },
         skip,
         take: parseInt(limit)
       }),
@@ -278,6 +280,35 @@ router.get('/meta/statuses', authMiddleware, async (req, res) => {
     { value: 'CANCELLED', label: 'Cancelled' }
   ];
   res.json(statuses);
+});
+
+// Bulk delete inspections
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: 'No IDs provided' });
+    await req.prisma.inspection.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${ids.length} inspections deleted` });
+  } catch (error) {
+    console.error('Bulk delete inspections error:', error);
+    res.status(500).json({ error: 'Failed to delete inspections' });
+  }
+});
+
+// Bulk update inspections
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: 'No IDs provided' });
+    const allowed = ['status'];
+    const updateData = {};
+    for (const key of allowed) { if (data[key] !== undefined) updateData[key] = data[key]; }
+    await req.prisma.inspection.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${ids.length} inspections updated` });
+  } catch (error) {
+    console.error('Bulk update inspections error:', error);
+    res.status(500).json({ error: 'Failed to update inspections' });
+  }
 });
 
 module.exports = router;

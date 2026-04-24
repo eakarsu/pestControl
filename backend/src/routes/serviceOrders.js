@@ -142,6 +142,29 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Bulk delete service orders
+router.post('/bulk-delete', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const result = await req.prisma.serviceOrder.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `${result.count} service orders deleted`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to delete service orders' }); }
+});
+
+// Bulk update service orders
+router.post('/bulk-update', authMiddleware, async (req, res) => {
+  try {
+    const { ids, data } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    const allowedFields = ['status', 'priority'];
+    const updateData = {};
+    for (const field of allowedFields) { if (data[field] !== undefined) updateData[field] = data[field]; }
+    const result = await req.prisma.serviceOrder.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `${result.count} service orders updated`, count: result.count });
+  } catch (error) { res.status(500).json({ error: 'Failed to update service orders' }); }
+});
+
 // Clock in
 router.post('/:id/clock-in', authMiddleware, async (req, res) => {
   try {
