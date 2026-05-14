@@ -99,6 +99,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/ai-extras', require('./routes/aiExtras'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -127,6 +128,8 @@ process.on('SIGTERM', async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
+
+app.use('/api', require('./routes/gap-features')); // === Batch 11 Gaps & Frontend Mounts ===
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

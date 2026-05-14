@@ -26,6 +26,7 @@ const navItems = [
   { divider: true },
   { path: '/compliance', label: 'Compliance', icon: FiShield },
   { path: '/ai-tools', label: 'AI Tools', icon: FiCpu },
+  { path: '/ai-advisors', label: 'AI Advisors', icon: FiCpu },
   { path: '/reports', label: 'Reports', icon: FiBarChart2 },
   { path: '/settings', label: 'Settings', icon: FiSettings },
 ];
