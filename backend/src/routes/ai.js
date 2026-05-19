@@ -634,4 +634,120 @@ Respond in JSON format with:
   }
 });
 
+// AI Chemical Safety Checker - safety/hazmat compliance review for product applications
+router.post('/chemical-safety-checker', authMiddleware, async (req, res) => {
+  try {
+    const { productName, applicationContext, location, sensitiveOccupants } = req.body;
+
+    if (!productName) {
+      return res.status(400).json({ error: 'productName is required' });
+    }
+
+    const messages = [
+      { role: 'system', content: 'You are a pest control hazmat & chemical safety advisor. Evaluate the proposed product application for safety/compliance considerations including PPE requirements, re-entry intervals, ventilation, label restrictions, sensitive populations (pets, children, pollinators), and storage. Output strict JSON: { riskLevel, ppe, reentryIntervalHours, restrictions, precautions, compliance: { fifra, stateRegistration, notes }, summary }. This is informational only, not legal/regulatory advice.' },
+      { role: 'user', content: `Product: ${productName}\nApplication Context: ${applicationContext || 'unspecified'}\nLocation: ${location || 'unspecified'}\nSensitive Occupants: ${JSON.stringify(sensitiveOccupants || [])}\n\nReturn JSON only.` }
+    ];
+
+    const aiResponse = await callOpenRouter(messages, 1500);
+
+    let parsed = null;
+    try {
+      const m = aiResponse.match(/\{[\s\S]*\}/);
+      if (m) parsed = JSON.parse(m[0]);
+    } catch (_) {}
+
+    res.json(parsed || { rawAnalysis: aiResponse });
+  } catch (error) {
+    console.error('Chemical safety checker error:', error);
+    res.status(500).json({ error: 'Failed to run safety check' });
+  }
+});
+
+// AI Equipment Maintenance Scheduler - propose maintenance schedule based on equipment usage / fleet info
+router.post('/equipment-maintenance-scheduler', authMiddleware, async (req, res) => {
+  try {
+    const { equipment, fleetSummary, horizonDays } = req.body || {};
+
+    if (!equipment && !fleetSummary) {
+      return res.status(400).json({ error: 'equipment array or fleetSummary is required' });
+    }
+
+    const messages = [
+      { role: 'system', content: 'You are a fleet/equipment maintenance planner for a pest control operation. Given equipment usage, age, last-service info, and operating context, output a prioritized maintenance schedule. Output strict JSON: { schedule: [{ equipmentId, equipmentName, recommendedAction, urgency (low/medium/high), recommendedDate, estimatedDurationHours, partsOrConsumables: [], rationale }], summary, totalItems, criticalCount }.' },
+      { role: 'user', content: `Equipment list: ${JSON.stringify(equipment || [])}\nFleet summary: ${JSON.stringify(fleetSummary || null)}\nHorizon (days): ${horizonDays || 60}\n\nReturn JSON only.` }
+    ];
+
+    let aiResponse;
+    try {
+      aiResponse = await callOpenRouter(messages, 1500);
+    } catch (err) {
+      if (err.message && err.message.includes('OPENROUTER_API_KEY not configured')) {
+        return res.status(503).json({ error: 'AI service not configured (OPENROUTER_API_KEY missing)' });
+      }
+      throw err;
+    }
+
+    let parsed = null;
+    try {
+      const m = aiResponse.match(/\{[\s\S]*\}/);
+      if (m) parsed = JSON.parse(m[0]);
+    } catch (_) {}
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      horizonDays: horizonDays || 60,
+      result: parsed || { rawAnalysis: aiResponse }
+    });
+  } catch (error) {
+    console.error('Equipment maintenance scheduler error:', error);
+    res.status(500).json({ error: 'Failed to generate maintenance schedule' });
+  }
+});
+
+// AI Customer Churn Predictor - score churn risk for an account
+router.post('/customer-churn-predictor', authMiddleware, async (req, res) => {
+  try {
+    const { customerId } = req.body;
+
+    if (!customerId) {
+      return res.status(400).json({ error: 'customerId is required' });
+    }
+
+    const customer = await req.prisma.customer.findUnique({
+      where: { id: customerId },
+      include: {
+        properties: true,
+        serviceOrders: { orderBy: { createdAt: 'desc' }, take: 20 },
+        invoices: { orderBy: { createdAt: 'desc' }, take: 20 }
+      }
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const messages = [
+      { role: 'system', content: 'You are a customer success analyst for a pest control company. Predict churn risk based on service history, invoicing, and engagement signals. Output strict JSON: { churnScore (0-1), riskLevel (low/medium/high), drivers, retentionActions, rationale }.' },
+      { role: 'user', content: `Customer:\n${JSON.stringify({ id: customer.id, name: customer.name, createdAt: customer.createdAt, status: customer.status }, null, 2)}\n\nProperties: ${customer.properties?.length || 0}\nRecent Service Orders: ${JSON.stringify((customer.serviceOrders || []).map(o => ({ id: o.id, status: o.status, createdAt: o.createdAt })), null, 2)}\nRecent Invoices: ${JSON.stringify((customer.invoices || []).map(i => ({ id: i.id, status: i.status, total: i.total, createdAt: i.createdAt })), null, 2)}\n\nReturn JSON only.` }
+    ];
+
+    const aiResponse = await callOpenRouter(messages, 1200);
+
+    let parsed = null;
+    try {
+      const m = aiResponse.match(/\{[\s\S]*\}/);
+      if (m) parsed = JSON.parse(m[0]);
+    } catch (_) {}
+
+    res.json({
+      customerId,
+      prediction: parsed || { rawAnalysis: aiResponse },
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Customer churn predictor error:', error);
+    res.status(500).json({ error: 'Failed to predict churn' });
+  }
+});
+
 module.exports = router;

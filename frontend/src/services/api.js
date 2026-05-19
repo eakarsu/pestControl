@@ -264,7 +264,10 @@ export const aiService = {
   generateQuote: (data) => api.post('/ai/generate-quote', data),
   generateFollowUps: () => api.post('/ai/generate-follow-ups'),
   recommendUpsell: (data) => api.post('/ai/recommend-upsell', data),
-  autoCompleteReport: (data) => api.post('/ai/auto-complete-report', data)
+  autoCompleteReport: (data) => api.post('/ai/auto-complete-report', data),
+  chemicalSafetyChecker: (data) => api.post('/ai/chemical-safety-checker', data),
+  customerChurnPredictor: (data) => api.post('/ai/customer-churn-predictor', data),
+  equipmentMaintenanceScheduler: (data) => api.post('/ai/equipment-maintenance-scheduler', data)
 };
 
 export const dashboardService = {

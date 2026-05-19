@@ -1,3 +1,14 @@
+// === Batch 11 Gaps & Frontend Mounts ===
+import GapChemicalSafetyCheckerPage from './pages/gap/GapChemicalSafetyCheckerPage'
+import GapCustomerChurnPredictorPage from './pages/gap/GapCustomerChurnPredictorPage'
+import GapEquipmentMaintenancePage from './pages/gap/GapEquipmentMaintenancePage'
+import GapInvoicePaymentPredictionPage from './pages/gap/GapInvoicePaymentPredictionPage'
+import GapPaymentProcessorPage from './pages/gap/GapPaymentProcessorPage'
+import GapMobileTechnicianPage from './pages/gap/GapMobileTechnicianPage'
+import GapSmsEmailDispatchPage from './pages/gap/GapSmsEmailDispatchPage'
+import GapIotSensorPage from './pages/gap/GapIotSensorPage'
+import GapCustomerPortalPage from './pages/gap/GapCustomerPortalPage'
+import GapSubscriptionBillingPage from './pages/gap/GapSubscriptionBillingPage'
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
@@ -22,9 +33,11 @@ import Quotes from './pages/Quotes';
 import Inspections from './pages/Inspections';
 import Compliance from './pages/Compliance';
 import AITools from './pages/AITools';
+import AIAdvisors from './pages/AIAdvisors';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import TechnicianApp from './pages/TechnicianApp';
+import CustomViewsPage from './pages/CustomViewsPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -88,15 +101,28 @@ function App() {
                   <Route path="/inspections" element={<Inspections />} />
                   <Route path="/compliance" element={<Compliance />} />
                   <Route path="/ai-tools" element={<AITools />} />
+                  <Route path="/ai-advisors" element={<AIAdvisors />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/custom-views" element={<CustomViewsPage />} />
                 </Routes>
               </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         }
       />
-    </Routes>
+          {/* === Batch 11 Gaps & Frontend Mounts === */}
+        <Route path="/gap/chemical-safety-checker" element={<GapChemicalSafetyCheckerPage />} />
+        <Route path="/gap/customer-churn-predictor" element={<GapCustomerChurnPredictorPage />} />
+        <Route path="/gap/equipment-maintenance" element={<GapEquipmentMaintenancePage />} />
+        <Route path="/gap/invoice-payment-prediction" element={<GapInvoicePaymentPredictionPage />} />
+        <Route path="/gap/payment-processor" element={<GapPaymentProcessorPage />} />
+        <Route path="/gap/mobile-technician" element={<GapMobileTechnicianPage />} />
+        <Route path="/gap/sms-email-dispatch" element={<GapSmsEmailDispatchPage />} />
+        <Route path="/gap/iot-sensor" element={<GapIotSensorPage />} />
+        <Route path="/gap/customer-portal" element={<GapCustomerPortalPage />} />
+        <Route path="/gap/subscription-billing" element={<GapSubscriptionBillingPage />} />
+      </Routes>
     </ErrorBoundary>
   );
 }
