@@ -37,6 +37,7 @@ import AIAdvisors from './pages/AIAdvisors';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import TechnicianApp from './pages/TechnicianApp';
+import CustomViewsPage from './pages/CustomViewsPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -103,6 +104,7 @@ function App() {
                   <Route path="/ai-advisors" element={<AIAdvisors />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/custom-views" element={<CustomViewsPage />} />
                 </Routes>
               </ErrorBoundary>
             </Layout>

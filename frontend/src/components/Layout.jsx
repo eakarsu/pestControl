@@ -29,6 +29,7 @@ const navItems = [
   { path: '/ai-advisors', label: 'AI Advisors', icon: FiCpu },
   { path: '/reports', label: 'Reports', icon: FiBarChart2 },
   { path: '/settings', label: 'Settings', icon: FiSettings },
+  { path: '/custom-views', label: 'Pest Views', icon: FiBarChart2 },
 ];
 
 const Layout = ({ children }) => {
