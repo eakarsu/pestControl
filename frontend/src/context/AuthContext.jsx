@@ -16,8 +16,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const storedUser = sessionStorage.getItem('user');
 
     if (token && storedUser) {
       setUser(JSON.parse(storedUser));
@@ -30,29 +30,18 @@ export const AuthProvider = ({ children }) => {
     const response = await api.post('/auth/login', { email, password });
     const { user, token } = response.data;
 
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('user', JSON.stringify(user));
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
     setUser(user);
     return user;
   };
 
-  const register = async (userData) => {
-    const response = await api.post('/auth/register', userData);
-    const { user, token } = response.data;
-
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-    setUser(user);
-    return user;
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    try { await api.post('/auth/logout'); } catch { /* Local logout still clears a failed/expired session. */ }
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     delete api.defaults.headers.common['Authorization'];
     setUser(null);
   };
@@ -61,7 +50,6 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
-    register,
     logout,
     isAuthenticated: !!user
   };

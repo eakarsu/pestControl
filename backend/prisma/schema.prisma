@@ -9,30 +9,41 @@ datasource db {
 
 // User Management
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String
-  firstName     String
-  lastName      String
-  phone         String?
-  role          UserRole  @default(TECHNICIAN)
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  firstName   String
+  lastName    String
+  phone       String?
+  role        UserRole @default(TECHNICIAN)
+  isActive    Boolean  @default(true)
+  authVersion Int      @default(1)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   // Relations
-  technician    Technician?
-  salesRep      SalesRep?
-  sessions      Session[]
-  passwordResetTokens PasswordResetToken[]
+  technician              Technician?
+  salesRep                SalesRep?
+  sessions                Session[]
+  passwordResetTokens     PasswordResetToken[]
+  evidenceAccessGrants    ServiceOrderAccessGrant[] @relation("EvidenceGrantee")
+  grantedEvidenceAccess   ServiceOrderAccessGrant[] @relation("EvidenceGrantor")
+  createdEvidenceVersions ServiceEvidenceVersion[]  @relation("EvidenceVersionCreator")
+  evidenceReviews         EvidenceReview[]          @relation("EvidenceReviewer")
+  evidenceConnectors      ExternalConnector[]       @relation("ConnectorServiceUser")
+  requestedExports        EvidenceExport[]          @relation("EvidenceExportRequester")
+  requestedDispositions   EvidenceDisposition[]     @relation("DispositionRequester")
+  reviewedDispositions    EvidenceDisposition[]     @relation("DispositionReviewer")
+  placedLegalHolds        LegalHold[]               @relation("LegalHoldPlacer")
+  releasedLegalHolds      LegalHold[]               @relation("LegalHoldReleaser")
 }
 
 model Session {
   id        String   @id @default(uuid())
   userId    String
   token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -40,9 +51,9 @@ model PasswordResetToken {
   id        String   @id @default(uuid())
   userId    String
   token     String   @unique
-  expiresAt DateTime
+  expiresAt DateTime @db.Timestamptz(3)
   used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -56,27 +67,27 @@ enum UserRole {
 
 // Customer Management
 model Customer {
-  id              String    @id @default(uuid())
-  companyName     String?
-  firstName       String
-  lastName        String
-  email           String    @unique
-  phone           String
-  alternatePhone  String?
-  customerType    CustomerType @default(RESIDENTIAL)
-  status          CustomerStatus @default(ACTIVE)
-  notes           String?
-  referralSource  String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String         @id @default(uuid())
+  companyName    String?
+  firstName      String
+  lastName       String
+  email          String         @unique
+  phone          String
+  alternatePhone String?
+  customerType   CustomerType   @default(RESIDENTIAL)
+  status         CustomerStatus @default(ACTIVE)
+  notes          String?
+  referralSource String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   // Relations
-  properties      Property[]
-  contracts       Contract[]
-  invoices        Invoice[]
-  leads           Lead[]
-  quotes          Quote[]
-  communications  Communication[]
+  properties     Property[]
+  contracts      Contract[]
+  invoices       Invoice[]
+  leads          Lead[]
+  quotes         Quote[]
+  communications Communication[]
 }
 
 enum CustomerType {
@@ -94,33 +105,33 @@ enum CustomerStatus {
 
 // Property Information
 model Property {
-  id              String    @id @default(uuid())
-  customerId      String
-  name            String
-  addressLine1    String
-  addressLine2    String?
-  city            String
-  state           String
-  zipCode         String
-  country         String    @default("USA")
-  latitude        Float?
-  longitude       Float?
-  propertyType    PropertyType @default(SINGLE_FAMILY)
-  squareFootage   Int?
-  yearBuilt       Int?
-  accessNotes     String?
-  gateCode        String?
-  hasPets         Boolean   @default(false)
-  petDetails      String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String       @id @default(uuid())
+  customerId    String
+  name          String
+  addressLine1  String
+  addressLine2  String?
+  city          String
+  state         String
+  zipCode       String
+  country       String       @default("USA")
+  latitude      Float?
+  longitude     Float?
+  propertyType  PropertyType @default(SINGLE_FAMILY)
+  squareFootage Int?
+  yearBuilt     Int?
+  accessNotes   String?
+  gateCode      String?
+  hasPets       Boolean      @default(false)
+  petDetails    String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   // Relations
-  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  pestIssues      PestIssue[]
-  services        Service[]
-  inspections     Inspection[]
-  serviceOrders   ServiceOrder[]
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pestIssues    PestIssue[]
+  services      Service[]
+  inspections   Inspection[]
+  serviceOrders ServiceOrder[]
 }
 
 enum PropertyType {
@@ -139,24 +150,24 @@ enum PropertyType {
 
 // Pest Issues Log
 model PestIssue {
-  id              String    @id @default(uuid())
-  propertyId      String
-  pestTypeId      String
-  severity        Severity  @default(MODERATE)
-  location        String
-  description     String?
-  firstReported   DateTime  @default(now())
-  lastObserved    DateTime?
-  status          IssueStatus @default(ACTIVE)
-  photoUrls       String[]
-  aiIdentified    Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String      @id @default(uuid())
+  propertyId    String
+  pestTypeId    String
+  severity      Severity    @default(MODERATE)
+  location      String
+  description   String?
+  firstReported DateTime    @default(now())
+  lastObserved  DateTime?
+  status        IssueStatus @default(ACTIVE)
+  photoUrls     String[]
+  aiIdentified  Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   // Relations
-  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  pestType        PestType  @relation(fields: [pestTypeId], references: [id])
-  treatments      TreatmentRecord[]
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  pestType   PestType          @relation(fields: [pestTypeId], references: [id])
+  treatments TreatmentRecord[]
 }
 
 enum Severity {
@@ -174,43 +185,43 @@ enum IssueStatus {
 }
 
 model PestType {
-  id              String    @id @default(uuid())
-  name            String    @unique
-  category        String
-  description     String?
+  id               String   @id @default(uuid())
+  name             String   @unique
+  category         String
+  description      String?
   commonTreatments String[]
-  seasonalPeak    String[]
-  riskLevel       String?
-  imageUrl        String?
-  createdAt       DateTime  @default(now())
+  seasonalPeak     String[]
+  riskLevel        String?
+  imageUrl         String?
+  createdAt        DateTime @default(now())
 
-  pestIssues      PestIssue[]
+  pestIssues               PestIssue[]
   treatmentRecommendations TreatmentRecommendation[]
 }
 
 // Contract Management
 model Contract {
-  id              String    @id @default(uuid())
-  customerId      String
-  contractNumber  String    @unique
-  name            String
-  contractType    ContractType @default(RECURRING)
-  startDate       DateTime
-  endDate         DateTime?
+  id               String           @id @default(uuid())
+  customerId       String
+  contractNumber   String           @unique
+  name             String
+  contractType     ContractType     @default(RECURRING)
+  startDate        DateTime
+  endDate          DateTime?
   billingFrequency BillingFrequency @default(MONTHLY)
-  contractValue   Float
-  status          ContractStatus @default(ACTIVE)
-  terms           String?
-  signedDate      DateTime?
-  signatureUrl    String?
-  autoRenew       Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  contractValue    Float
+  status           ContractStatus   @default(ACTIVE)
+  terms            String?
+  signedDate       DateTime?
+  signatureUrl     String?
+  autoRenew        Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   // Relations
-  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  serviceOrders   ServiceOrder[]
-  invoices        Invoice[]
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceOrders ServiceOrder[]
+  invoices      Invoice[]
 }
 
 enum ContractType {
@@ -239,26 +250,26 @@ enum ContractStatus {
 
 // Billing Information
 model Invoice {
-  id              String    @id @default(uuid())
-  customerId      String
-  contractId      String?
-  invoiceNumber   String    @unique
-  issueDate       DateTime  @default(now())
-  dueDate         DateTime
-  subtotal        Float
-  tax             Float     @default(0)
-  total           Float
-  amountPaid      Float     @default(0)
-  status          InvoiceStatus @default(PENDING)
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String        @id @default(uuid())
+  customerId    String
+  contractId    String?
+  invoiceNumber String        @unique
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  subtotal      Float
+  tax           Float         @default(0)
+  total         Float
+  amountPaid    Float         @default(0)
+  status        InvoiceStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   // Relations
-  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  contract        Contract? @relation(fields: [contractId], references: [id])
-  lineItems       InvoiceLineItem[]
-  payments        Payment[]
+  customer  Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  contract  Contract?         @relation(fields: [contractId], references: [id])
+  lineItems InvoiceLineItem[]
+  payments  Payment[]
 }
 
 enum InvoiceStatus {
@@ -272,27 +283,27 @@ enum InvoiceStatus {
 }
 
 model InvoiceLineItem {
-  id              String    @id @default(uuid())
-  invoiceId       String
-  description     String
-  quantity        Float
-  unitPrice       Float
-  total           Float
-  serviceOrderId  String?
+  id             String  @id @default(uuid())
+  invoiceId      String
+  description    String
+  quantity       Float
+  unitPrice      Float
+  total          Float
+  serviceOrderId String?
 
-  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
-  id              String    @id @default(uuid())
-  invoiceId       String
-  amount          Float
-  paymentMethod   PaymentMethod
-  transactionId   String?
-  paymentDate     DateTime  @default(now())
-  notes           String?
+  id            String        @id @default(uuid())
+  invoiceId     String
+  amount        Float
+  paymentMethod PaymentMethod
+  transactionId String?
+  paymentDate   DateTime      @default(now())
+  notes         String?
 
-  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
 enum PaymentMethod {
@@ -306,19 +317,19 @@ enum PaymentMethod {
 
 // Service Management
 model ServiceType {
-  id              String    @id @default(uuid())
-  name            String    @unique
-  description     String?
-  category        ServiceCategory @default(GENERAL)
-  basePrice       Float
-  duration        Int       // in minutes
-  isRecurring     Boolean   @default(false)
-  frequency       String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id          String          @id @default(uuid())
+  name        String          @unique
+  description String?
+  category    ServiceCategory @default(GENERAL)
+  basePrice   Float
+  duration    Int // in minutes
+  isRecurring Boolean         @default(false)
+  frequency   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  services        Service[]
-  serviceOrders   ServiceOrder[]
+  services      Service[]
+  serviceOrders ServiceOrder[]
 }
 
 enum ServiceCategory {
@@ -334,22 +345,22 @@ enum ServiceCategory {
 }
 
 model Service {
-  id              String    @id @default(uuid())
-  propertyId      String
-  serviceTypeId   String
-  scheduledDate   DateTime
-  completedDate   DateTime?
-  status          ServiceStatus @default(SCHEDULED)
-  technicianId    String?
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String        @id @default(uuid())
+  propertyId    String
+  serviceTypeId String
+  scheduledDate DateTime
+  completedDate DateTime?
+  status        ServiceStatus @default(SCHEDULED)
+  technicianId  String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   // Relations
-  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  serviceType     ServiceType @relation(fields: [serviceTypeId], references: [id])
-  technician      Technician? @relation(fields: [technicianId], references: [id])
-  treatments      TreatmentRecord[]
+  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  serviceType ServiceType       @relation(fields: [serviceTypeId], references: [id])
+  technician  Technician?       @relation(fields: [technicianId], references: [id])
+  treatments  TreatmentRecord[]
 }
 
 enum ServiceStatus {
@@ -363,90 +374,95 @@ enum ServiceStatus {
 
 // Products
 model Product {
-  id              String    @id @default(uuid())
-  name            String
-  sku             String    @unique
-  barcode         String?   @unique
-  category        String
-  manufacturer    String?
-  activeIngredient String?
-  concentration   String?
-  epaNumber       String?
-  unitOfMeasure   String
-  unitCost        Float
-  inStock         Float     @default(0)
-  reorderLevel    Float     @default(10)
+  id                 String   @id @default(uuid())
+  name               String
+  sku                String   @unique
+  barcode            String?  @unique
+  category           String
+  manufacturer       String?
+  activeIngredient   String?
+  concentration      String?
+  epaNumber          String?
+  unitOfMeasure      String
+  unitCost           Float
+  inStock            Float    @default(0)
+  reorderLevel       Float    @default(10)
   safetyDataSheetUrl String?
-  isRestricted    Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  isRestricted       Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  treatments      TreatmentRecord[]
-  productUsages   ProductUsage[]
+  treatments    TreatmentRecord[]
+  productUsages ProductUsage[]
 }
 
 // Treatment Records
 model TreatmentRecord {
-  id              String    @id @default(uuid())
-  serviceId       String?
-  pestIssueId     String?
-  productId       String
+  id                String   @id @default(uuid())
+  serviceId         String?
+  pestIssueId       String?
+  productId         String
   applicationMethod String
-  areasTreated    String[]
-  quantity        Float
-  unit            String
-  dilutionRate    String?
-  targetPests     String[]
+  areasTreated      String[]
+  quantity          Float
+  unit              String
+  dilutionRate      String?
+  targetPests       String[]
   weatherConditions String?
-  temperature     Float?
-  humidity        Float?
-  windSpeed       Float?
-  notes           String?
-  appliedAt       DateTime  @default(now())
-  appliedById     String
+  temperature       Float?
+  humidity          Float?
+  windSpeed         Float?
+  notes             String?
+  appliedAt         DateTime @default(now())
+  appliedById       String
 
   // Relations
-  service         Service?  @relation(fields: [serviceId], references: [id])
-  pestIssue       PestIssue? @relation(fields: [pestIssueId], references: [id])
-  product         Product   @relation(fields: [productId], references: [id])
-  appliedBy       Technician @relation(fields: [appliedById], references: [id])
+  service   Service?   @relation(fields: [serviceId], references: [id])
+  pestIssue PestIssue? @relation(fields: [pestIssueId], references: [id])
+  product   Product    @relation(fields: [productId], references: [id])
+  appliedBy Technician @relation(fields: [appliedById], references: [id])
 }
 
 // Service Orders (Work Orders)
 model ServiceOrder {
-  id              String    @id @default(uuid())
-  orderNumber     String    @unique
-  propertyId      String
-  contractId      String?
-  serviceTypeId   String
-  technicianId    String?
-  scheduledDate   DateTime
+  id                 String             @id @default(uuid())
+  orderNumber        String             @unique
+  propertyId         String
+  contractId         String?
+  serviceTypeId      String
+  technicianId       String?
+  scheduledDate      DateTime
   scheduledTimeStart String?
-  scheduledTimeEnd String?
-  completedDate   DateTime?
-  status          ServiceOrderStatus @default(PENDING)
-  priority        Priority  @default(NORMAL)
-  isRetreatment   Boolean   @default(false)
-  originalOrderId String?
-  customerNotes   String?
-  technicianNotes String?
-  internalNotes   String?
-  signatureUrl    String?
-  signedBy        String?
-  signedAt        DateTime?
-  photoUrls       String[]
-  timeIn          DateTime?
-  timeOut         DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  scheduledTimeEnd   String?
+  completedDate      DateTime?
+  status             ServiceOrderStatus @default(PENDING)
+  priority           Priority           @default(NORMAL)
+  isRetreatment      Boolean            @default(false)
+  originalOrderId    String?
+  customerNotes      String?
+  technicianNotes    String?
+  internalNotes      String?
+  signatureUrl       String?
+  signedBy           String?
+  signedAt           DateTime?
+  photoUrls          String[]
+  timeIn             DateTime?
+  timeOut            DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   // Relations
-  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  contract        Contract? @relation(fields: [contractId], references: [id])
-  serviceType     ServiceType @relation(fields: [serviceTypeId], references: [id])
-  technician      Technician? @relation(fields: [technicianId], references: [id])
-  productUsages   ProductUsage[]
-  followUps       FollowUp[]
+  property             Property                  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  contract             Contract?                 @relation(fields: [contractId], references: [id])
+  serviceType          ServiceType               @relation(fields: [serviceTypeId], references: [id])
+  technician           Technician?               @relation(fields: [technicianId], references: [id])
+  productUsages        ProductUsage[]
+  followUps            FollowUp[]
+  evidenceDocuments    ServiceEvidenceDocument[]
+  evidenceAccessGrants ServiceOrderAccessGrant[]
+  legalHolds           LegalHold[]
+  evidenceExports      EvidenceExport[]
+  evidenceAudits       EvidenceAuditEvent[]
 }
 
 enum ServiceOrderStatus {
@@ -468,7 +484,7 @@ enum Priority {
 
 // Product Usage per Service Order
 model ProductUsage {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   serviceOrderId  String
   productId       String
   quantity        Float
@@ -476,67 +492,67 @@ model ProductUsage {
   applicationRate String?
   areasTreated    String[]
   notes           String?
-  usedAt          DateTime  @default(now())
+  usedAt          DateTime @default(now())
 
-  serviceOrder    ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
-  product         Product   @relation(fields: [productId], references: [id])
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
 }
 
 // Technician Management
 model Technician {
-  id              String    @id @default(uuid())
-  userId          String    @unique
-  employeeId      String    @unique
-  licenseNumber   String?
-  licenseState    String?
-  licenseExpiry   DateTime?
-  certifications  String[]
-  specializations String[]
-  vehicleId       String?
-  territoryId     String?
-  isAvailable     Boolean   @default(true)
-  currentLatitude Float?
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  employeeId       String    @unique
+  licenseNumber    String?
+  licenseState     String?
+  licenseExpiry    DateTime?
+  certifications   String[]
+  specializations  String[]
+  vehicleId        String?
+  territoryId      String?
+  isAvailable      Boolean   @default(true)
+  currentLatitude  Float?
   currentLongitude Float?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  territory       Territory? @relation(fields: [territoryId], references: [id])
-  services        Service[]
-  serviceOrders   ServiceOrder[]
-  treatments      TreatmentRecord[]
-  schedules       TechnicianSchedule[]
-  timeEntries     TimeEntry[]
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  territory     Territory?           @relation(fields: [territoryId], references: [id])
+  services      Service[]
+  serviceOrders ServiceOrder[]
+  treatments    TreatmentRecord[]
+  schedules     TechnicianSchedule[]
+  timeEntries   TimeEntry[]
 }
 
 // Scheduling
 model TechnicianSchedule {
-  id              String    @id @default(uuid())
-  technicianId    String
-  date            DateTime
-  startTime       String
-  endTime         String
-  isAvailable     Boolean   @default(true)
-  notes           String?
+  id           String   @id @default(uuid())
+  technicianId String
+  date         DateTime
+  startTime    String
+  endTime      String
+  isAvailable  Boolean  @default(true)
+  notes        String?
 
-  technician      Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  technician Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
   @@unique([technicianId, date])
 }
 
 // Time Tracking
 model TimeEntry {
-  id              String    @id @default(uuid())
-  technicianId    String
-  date            DateTime
-  clockIn         DateTime
-  clockOut        DateTime?
-  breakMinutes    Int       @default(0)
-  notes           String?
-  status          TimeEntryStatus @default(PENDING)
+  id           String          @id @default(uuid())
+  technicianId String
+  date         DateTime
+  clockIn      DateTime
+  clockOut     DateTime?
+  breakMinutes Int             @default(0)
+  notes        String?
+  status       TimeEntryStatus @default(PENDING)
 
-  technician      Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  technician Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 }
 
 enum TimeEntryStatus {
@@ -547,29 +563,29 @@ enum TimeEntryStatus {
 
 // Territory Management
 model Territory {
-  id              String    @id @default(uuid())
-  name            String    @unique
-  description     String?
-  zipCodes        String[]
-  color           String?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  zipCodes    String[]
+  color       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
-  technicians     Technician[]
+  technicians Technician[]
 }
 
 // Route Optimization
 model Route {
-  id              String    @id @default(uuid())
-  date            DateTime
-  technicianId    String
-  stops           Json      // Array of stops with order
-  totalDistance   Float?
-  totalDuration   Int?      // in minutes
-  optimizedAt     DateTime?
-  status          RouteStatus @default(PLANNED)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String      @id @default(uuid())
+  date          DateTime
+  technicianId  String
+  stops         Json // Array of stops with order
+  totalDistance Float?
+  totalDuration Int? // in minutes
+  optimizedAt   DateTime?
+  status        RouteStatus @default(PLANNED)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 enum RouteStatus {
@@ -580,18 +596,18 @@ enum RouteStatus {
 
 // Compliance - License Tracking
 model License {
-  id              String    @id @default(uuid())
-  type            LicenseType
-  licenseNumber   String
-  issuedBy        String
-  issuedTo        String
-  issueDate       DateTime
-  expiryDate      DateTime
-  status          LicenseStatus @default(ACTIVE)
-  documentUrl     String?
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String        @id @default(uuid())
+  type          LicenseType
+  licenseNumber String
+  issuedBy      String
+  issuedTo      String
+  issueDate     DateTime
+  expiryDate    DateTime
+  status        LicenseStatus @default(ACTIVE)
+  documentUrl   String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 enum LicenseType {
@@ -611,73 +627,73 @@ enum LicenseStatus {
 
 // Product Registrations
 model ProductRegistration {
-  id              String    @id @default(uuid())
-  productName     String
-  epaNumber       String
-  stateRegNumber  String?
-  state           String
+  id               String   @id @default(uuid())
+  productName      String
+  epaNumber        String
+  stateRegNumber   String?
+  state            String
   registrationDate DateTime
-  expiryDate      DateTime
-  status          String    @default("ACTIVE")
-  documentUrl     String?
-  createdAt       DateTime  @default(now())
+  expiryDate       DateTime
+  status           String   @default("ACTIVE")
+  documentUrl      String?
+  createdAt        DateTime @default(now())
 }
 
 // Safety Data Sheets
 model SafetyDataSheet {
-  id              String    @id @default(uuid())
-  productName     String
-  manufacturer    String
-  revisionDate    DateTime
-  documentUrl     String
+  id                    String   @id @default(uuid())
+  productName           String
+  manufacturer          String
+  revisionDate          DateTime
+  documentUrl           String
   hazardClassifications String[]
-  firstAidMeasures String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  firstAidMeasures      String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 // Usage Reporting
 model UsageReport {
-  id              String    @id @default(uuid())
-  reportPeriod    String    // e.g., "2024-Q1"
-  productName     String
-  epaNumber       String?
-  totalQuantity   Float
-  unit            String
+  id               String    @id @default(uuid())
+  reportPeriod     String // e.g., "2024-Q1"
+  productName      String
+  epaNumber        String?
+  totalQuantity    Float
+  unit             String
   applicationCount Int
-  reportedBy      String
-  submittedAt     DateTime?
-  status          String    @default("DRAFT")
-  createdAt       DateTime  @default(now())
+  reportedBy       String
+  submittedAt      DateTime?
+  status           String    @default("DRAFT")
+  createdAt        DateTime  @default(now())
 }
 
 // Sales - Lead Management
 model Lead {
-  id              String    @id @default(uuid())
-  customerId      String?
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String
-  companyName     String?
-  addressLine1    String?
-  city            String?
-  state           String?
-  zipCode         String?
-  source          LeadSource @default(WEBSITE)
-  status          LeadStatus @default(NEW)
-  pestConcerns    String[]
-  notes           String?
-  assignedToId    String?
-  estimatedValue  Float?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String     @id @default(uuid())
+  customerId     String?
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String
+  companyName    String?
+  addressLine1   String?
+  city           String?
+  state          String?
+  zipCode        String?
+  source         LeadSource @default(WEBSITE)
+  status         LeadStatus @default(NEW)
+  pestConcerns   String[]
+  notes          String?
+  assignedToId   String?
+  estimatedValue Float?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  customer        Customer? @relation(fields: [customerId], references: [id])
-  assignedTo      SalesRep? @relation(fields: [assignedToId], references: [id])
-  inspections     Inspection[]
-  quotes          Quote[]
-  followUps       FollowUp[]
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  assignedTo  SalesRep?    @relation(fields: [assignedToId], references: [id])
+  inspections Inspection[]
+  quotes      Quote[]
+  followUps   FollowUp[]
 }
 
 enum LeadSource {
@@ -703,36 +719,36 @@ enum LeadStatus {
 
 // Sales Rep
 model SalesRep {
-  id              String    @id @default(uuid())
-  userId          String    @unique
-  employeeId      String    @unique
-  commissionRate  Float     @default(0.1)
-  quota           Float?
-  createdAt       DateTime  @default(now())
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  employeeId     String   @unique
+  commissionRate Float    @default(0.1)
+  quota          Float?
+  createdAt      DateTime @default(now())
 
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  leads           Lead[]
-  quotes          Quote[]
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leads  Lead[]
+  quotes Quote[]
 }
 
 // Inspections
 model Inspection {
-  id              String    @id @default(uuid())
-  leadId          String?
-  propertyId      String?
-  inspectorId     String
-  scheduledDate   DateTime
-  completedDate   DateTime?
-  status          InspectionStatus @default(SCHEDULED)
-  findings        Json?     // Pest findings, damage, recommendations
-  photoUrls       String[]
-  reportUrl       String?
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String           @id @default(uuid())
+  leadId        String?
+  propertyId    String?
+  inspectorId   String
+  scheduledDate DateTime
+  completedDate DateTime?
+  status        InspectionStatus @default(SCHEDULED)
+  findings      Json? // Pest findings, damage, recommendations
+  photoUrls     String[]
+  reportUrl     String?
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
-  lead            Lead?     @relation(fields: [leadId], references: [id])
-  property        Property? @relation(fields: [propertyId], references: [id])
+  lead     Lead?     @relation(fields: [leadId], references: [id])
+  property Property? @relation(fields: [propertyId], references: [id])
 }
 
 enum InspectionStatus {
@@ -744,27 +760,27 @@ enum InspectionStatus {
 
 // Quotes
 model Quote {
-  id              String    @id @default(uuid())
-  quoteNumber     String    @unique
-  customerId      String?
-  leadId          String?
-  salesRepId      String?
-  validUntil      DateTime
-  subtotal        Float
-  discount        Float     @default(0)
-  tax             Float     @default(0)
-  total           Float
-  status          QuoteStatus @default(DRAFT)
-  notes           String?
-  terms           String?
-  aiGenerated     Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id          String      @id @default(uuid())
+  quoteNumber String      @unique
+  customerId  String?
+  leadId      String?
+  salesRepId  String?
+  validUntil  DateTime
+  subtotal    Float
+  discount    Float       @default(0)
+  tax         Float       @default(0)
+  total       Float
+  status      QuoteStatus @default(DRAFT)
+  notes       String?
+  terms       String?
+  aiGenerated Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  customer        Customer? @relation(fields: [customerId], references: [id])
-  lead            Lead?     @relation(fields: [leadId], references: [id])
-  salesRep        SalesRep? @relation(fields: [salesRepId], references: [id])
-  lineItems       QuoteLineItem[]
+  customer  Customer?       @relation(fields: [customerId], references: [id])
+  lead      Lead?           @relation(fields: [leadId], references: [id])
+  salesRep  SalesRep?       @relation(fields: [salesRepId], references: [id])
+  lineItems QuoteLineItem[]
 }
 
 enum QuoteStatus {
@@ -777,34 +793,34 @@ enum QuoteStatus {
 }
 
 model QuoteLineItem {
-  id              String    @id @default(uuid())
-  quoteId         String
-  description     String
-  serviceType     String?
-  quantity        Float
-  unitPrice       Float
-  total           Float
-  frequency       String?
-  notes           String?
+  id          String  @id @default(uuid())
+  quoteId     String
+  description String
+  serviceType String?
+  quantity    Float
+  unitPrice   Float
+  total       Float
+  frequency   String?
+  notes       String?
 
-  quote           Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 }
 
 // Follow-ups
 model FollowUp {
-  id              String    @id @default(uuid())
-  leadId          String?
-  serviceOrderId  String?
-  type            FollowUpType
-  dueDate         DateTime
-  completedDate   DateTime?
-  status          FollowUpStatus @default(PENDING)
-  notes           String?
-  aiGenerated     Boolean   @default(false)
-  createdAt       DateTime  @default(now())
+  id             String         @id @default(uuid())
+  leadId         String?
+  serviceOrderId String?
+  type           FollowUpType
+  dueDate        DateTime
+  completedDate  DateTime?
+  status         FollowUpStatus @default(PENDING)
+  notes          String?
+  aiGenerated    Boolean        @default(false)
+  createdAt      DateTime       @default(now())
 
-  lead            Lead?     @relation(fields: [leadId], references: [id])
-  serviceOrder    ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  lead         Lead?         @relation(fields: [leadId], references: [id])
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
 }
 
 enum FollowUpType {
@@ -826,17 +842,17 @@ enum FollowUpStatus {
 
 // Communication Log
 model Communication {
-  id              String    @id @default(uuid())
-  customerId      String
-  type            CommunicationType
-  direction       String    // INBOUND or OUTBOUND
-  subject         String?
-  content         String
-  status          String?
-  aiHandled       Boolean   @default(false)
-  createdAt       DateTime  @default(now())
+  id         String            @id @default(uuid())
+  customerId String
+  type       CommunicationType
+  direction  String // INBOUND or OUTBOUND
+  subject    String?
+  content    String
+  status     String?
+  aiHandled  Boolean           @default(false)
+  createdAt  DateTime          @default(now())
 
-  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 }
 
 enum CommunicationType {
@@ -848,74 +864,473 @@ enum CommunicationType {
 
 // AI Treatment Recommendations
 model TreatmentRecommendation {
-  id              String    @id @default(uuid())
-  pestTypeId      String
-  severity        Severity
-  propertyType    PropertyType
-  season          String
+  id                  String       @id @default(uuid())
+  pestTypeId          String
+  severity            Severity
+  propertyType        PropertyType
+  season              String
   recommendedProducts String[]
-  applicationMethods String[]
-  frequency       String
-  estimatedCost   Float?
-  effectivenessScore Float?
-  notes           String?
-  createdAt       DateTime  @default(now())
+  applicationMethods  String[]
+  frequency           String
+  estimatedCost       Float?
+  effectivenessScore  Float?
+  notes               String?
+  createdAt           DateTime     @default(now())
 
-  pestType        PestType  @relation(fields: [pestTypeId], references: [id])
+  pestType PestType @relation(fields: [pestTypeId], references: [id])
 }
 
 // Seasonal Predictions
 model SeasonalPrediction {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   region          String
   zipCode         String?
   pestType        String
   month           Int
   year            Int
-  riskLevel       String    // LOW, MODERATE, HIGH, VERY_HIGH
+  riskLevel       String // LOW, MODERATE, HIGH, VERY_HIGH
   confidence      Float
   factors         String[]
   recommendations String[]
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime @default(now())
 
   @@unique([region, pestType, month, year])
 }
 
 // AI Pest Identification Log
 model PestIdentification {
-  id              String    @id @default(uuid())
-  imageUrl        String
-  identifiedPest  String?
-  confidence      Float?
-  alternativePests Json?    // Array of alternative identifications
-  recommendations String[]
-  status          String    @default("PENDING")
-  createdAt       DateTime  @default(now())
+  id               String   @id @default(uuid())
+  imageUrl         String
+  identifiedPest   String?
+  confidence       Float?
+  alternativePests Json? // Array of alternative identifications
+  recommendations  String[]
+  status           String   @default("PENDING")
+  createdAt        DateTime @default(now())
 }
 
 // Application Settings
 model Setting {
-  id              String    @id @default(uuid())
-  key             String    @unique
-  value           String
-  description     String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // Configuration for extensible dropdown options
 model Configuration {
-  id              String    @id @default(uuid())
-  category        String    // e.g., "PRODUCT_CATEGORY", "LEAD_SOURCE", "PAYMENT_METHOD"
-  value           String
-  label           String
-  sortOrder       Int       @default(0)
-  isActive        Boolean   @default(true)
-  isDefault       Boolean   @default(false)
-  metadata        Json?     // Additional data if needed
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id        String   @id @default(uuid())
+  category  String // e.g., "PRODUCT_CATEGORY", "LEAD_SOURCE", "PAYMENT_METHOD"
+  value     String
+  label     String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  isDefault Boolean  @default(false)
+  metadata  Json? // Additional data if needed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([category, value])
   @@index([category])
+}
+
+// Governed service-evidence workflow. Binary content and provider credentials are
+// intentionally never stored here; only immutable hashes, provenance, and secret references are persisted.
+enum EvidenceAccessLevel {
+  READ
+  CONTRIBUTE
+  REVIEW
+  ADMINISTER
+}
+
+enum EvidenceDocumentKind {
+  SERVICE_REPORT
+  TREATMENT_PLAN
+  INSPECTION_REPORT
+  SAFETY_DATA_SHEET
+  LICENSE
+  CONTRACT
+  EXPORT_MANIFEST
+}
+
+enum EvidenceDocumentStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SIGNATURE_PENDING
+  SIGNED
+  FILED
+  RETAINED
+  DISPOSED
+}
+
+enum EvidenceReviewDecision {
+  APPROVED
+  REJECTED
+}
+
+enum EvidenceOcrStatus {
+  NOT_REQUESTED
+  QUEUED
+  COMPLETED
+  FAILED
+}
+
+enum ExternalConnectorKind {
+  OCR
+  ESIGN
+  FILING
+  STORAGE
+  TEMPLATE
+}
+
+enum ExternalOperationType {
+  OCR_EXTRACT
+  ESIGN_SEND
+  FILE_RECORD
+  STORE_EXPORT
+  DELETE_OBJECT
+  TEMPLATE_REFRESH
+}
+
+enum ExternalOperationStatus {
+  QUEUED
+  PROCESSING
+  RETRY
+  COMPLETED
+  DEAD_LETTER
+  CANCELLED
+}
+
+enum SignatureEnvelopeStatus {
+  CREATED
+  SENT
+  SIGNED
+  DECLINED
+  FAILED
+  VOIDED
+}
+
+enum LegalHoldStatus {
+  ACTIVE
+  RELEASED
+}
+
+enum EvidenceDispositionStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  QUEUED
+  COMPLETED
+  FAILED
+}
+
+model ServiceOrderAccessGrant {
+  id               String              @id @default(uuid())
+  serviceOrderId   String
+  serviceOrder     ServiceOrder        @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User                @relation("EvidenceGrantee", fields: [userId], references: [id], onDelete: Cascade)
+  accessLevel      EvidenceAccessLevel
+  privilegedAccess Boolean             @default(false)
+  grantedById      String
+  grantedBy        User                @relation("EvidenceGrantor", fields: [grantedById], references: [id])
+  grantedAt        DateTime            @default(now()) @db.Timestamptz(3)
+  revokedAt        DateTime?           @db.Timestamptz(3)
+  revokeReason     String?
+
+  @@unique([serviceOrderId, userId])
+  @@index([userId, revokedAt])
+  @@map("service_order_access_grants")
+}
+
+model ServiceEvidenceDocument {
+  id                 String                   @id @default(uuid())
+  serviceOrderId     String
+  serviceOrder       ServiceOrder             @relation(fields: [serviceOrderId], references: [id], onDelete: Restrict)
+  kind               EvidenceDocumentKind
+  title              String
+  status             EvidenceDocumentStatus   @default(DRAFT)
+  privileged         Boolean                  @default(false)
+  jurisdiction       String
+  effectiveDate      DateTime                 @db.Timestamptz(3)
+  currentVersion     Int                      @default(0)
+  retentionPolicyId  String?
+  retentionPolicy    RetentionPolicy?         @relation(fields: [retentionPolicyId], references: [id])
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(3)
+  versions           ServiceEvidenceVersion[]
+  reviews            EvidenceReview[]
+  signatureEnvelopes SignatureEnvelope[]
+  operations         ExternalOperation[]
+  legalHolds         LegalHold[]
+  dispositions       EvidenceDisposition[]
+
+  @@index([serviceOrderId, status])
+  @@index([retentionPolicyId])
+  @@map("service_evidence_documents")
+}
+
+model ServiceEvidenceVersion {
+  id                    String                        @id @default(uuid())
+  documentId            String
+  document              ServiceEvidenceDocument       @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  version               Int
+  contentHash           String
+  mimeType              String
+  byteSize              Int
+  storageProvider       String
+  storageObjectKey      String
+  storageVersion        String
+  sourceSystem          String
+  sourceReference       String
+  provenance            Json
+  ocrStatus             EvidenceOcrStatus             @default(NOT_REQUESTED)
+  ocrTextHash           String?
+  redactedFromVersionId String?
+  redactedFrom          ServiceEvidenceVersion?       @relation("EvidenceRedactions", fields: [redactedFromVersionId], references: [id])
+  redactions            ServiceEvidenceVersion[]      @relation("EvidenceRedactions")
+  redactionManifest     Json?
+  templateVersionId     String?
+  templateVersion       AuthoritativeTemplateVersion? @relation(fields: [templateVersionId], references: [id])
+  createdById           String
+  createdBy             User                          @relation("EvidenceVersionCreator", fields: [createdById], references: [id])
+  createdAt             DateTime                      @default(now()) @db.Timestamptz(3)
+  reviews               EvidenceReview[]
+  signatureEnvelopes    SignatureEnvelope[]
+  operations            ExternalOperation[]
+
+  @@unique([documentId, version])
+  @@unique([storageProvider, storageObjectKey, storageVersion])
+  @@index([contentHash])
+  @@index([createdById])
+  @@map("service_evidence_versions")
+}
+
+model EvidenceReview {
+  id                         String                  @id @default(uuid())
+  documentId                 String
+  document                   ServiceEvidenceDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  versionId                  String
+  version                    ServiceEvidenceVersion  @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  reviewerId                 String
+  reviewer                   User                    @relation("EvidenceReviewer", fields: [reviewerId], references: [id])
+  decision                   EvidenceReviewDecision
+  reason                     String
+  jurisdictionValidated      Boolean
+  effectiveDateValidated     Boolean
+  productRegistrationChecked Boolean
+  safetyDataChecked          Boolean
+  createdAt                  DateTime                @default(now()) @db.Timestamptz(3)
+
+  @@unique([versionId, reviewerId])
+  @@index([documentId, createdAt])
+  @@map("evidence_reviews")
+}
+
+model AuthoritativeTemplate {
+  id           String                         @id @default(uuid())
+  name         String
+  kind         EvidenceDocumentKind
+  jurisdiction String
+  sourceSystem String
+  externalId   String
+  active       Boolean                        @default(true)
+  createdAt    DateTime                       @default(now()) @db.Timestamptz(3)
+  versions     AuthoritativeTemplateVersion[]
+
+  @@unique([sourceSystem, externalId])
+  @@index([kind, jurisdiction, active])
+  @@map("authoritative_templates")
+}
+
+model AuthoritativeTemplateVersion {
+  id               String                   @id @default(uuid())
+  templateId       String
+  template         AuthoritativeTemplate    @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  version          String
+  contentHash      String
+  storageProvider  String
+  storageObjectKey String
+  effectiveFrom    DateTime                 @db.Timestamptz(3)
+  effectiveTo      DateTime?                @db.Timestamptz(3)
+  approvedAt       DateTime                 @db.Timestamptz(3)
+  provenance       Json
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  evidenceVersions ServiceEvidenceVersion[]
+
+  @@unique([templateId, version])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("authoritative_template_versions")
+}
+
+model ExternalConnector {
+  id                 String                @id @default(uuid())
+  kind               ExternalConnectorKind
+  provider           String
+  baseUrl            String
+  credentialRef      String
+  webhookSecretRef   String?
+  serviceUserId      String
+  serviceUser        User                  @relation("ConnectorServiceUser", fields: [serviceUserId], references: [id])
+  enabled            Boolean               @default(true)
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
+  operations         ExternalOperation[]
+  signatureEnvelopes SignatureEnvelope[]
+
+  @@unique([kind, provider])
+  @@index([enabled])
+  @@map("external_connectors")
+}
+
+model ExternalOperation {
+  id               String                   @id @default(uuid())
+  connectorId      String
+  connector        ExternalConnector        @relation(fields: [connectorId], references: [id], onDelete: Restrict)
+  documentId       String?
+  document         ServiceEvidenceDocument? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  versionId        String?
+  version          ServiceEvidenceVersion?  @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  type             ExternalOperationType
+  status           ExternalOperationStatus  @default(QUEUED)
+  idempotencyKey   String                   @unique
+  payload          Json
+  payloadHash      String
+  attempts         Int                      @default(0)
+  maxAttempts      Int                      @default(5)
+  nextAttemptAt    DateTime                 @default(now()) @db.Timestamptz(3)
+  leaseOwner       String?
+  leaseExpiresAt   DateTime?                @db.Timestamptz(3)
+  providerReceipt  String?
+  lastErrorCode    String?
+  lastErrorMessage String?
+  completedAt      DateTime?                @db.Timestamptz(3)
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
+
+  @@index([status, nextAttemptAt])
+  @@index([leaseExpiresAt])
+  @@map("external_operations")
+}
+
+model SignatureEnvelope {
+  id             String                  @id @default(uuid())
+  documentId     String
+  document       ServiceEvidenceDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  versionId      String
+  version        ServiceEvidenceVersion  @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  connectorId    String
+  connector      ExternalConnector       @relation(fields: [connectorId], references: [id], onDelete: Restrict)
+  externalId     String?                 @unique
+  idempotencyKey String                  @unique
+  status         SignatureEnvelopeStatus @default(CREATED)
+  signers        Json
+  failureCode    String?
+  failureMessage String?
+  sentAt         DateTime?               @db.Timestamptz(3)
+  signedAt       DateTime?               @db.Timestamptz(3)
+  createdAt      DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime                @updatedAt @db.Timestamptz(3)
+
+  @@index([documentId, status])
+  @@map("signature_envelopes")
+}
+
+model RetentionPolicy {
+  id                    String                    @id @default(uuid())
+  name                  String                    @unique
+  jurisdiction          String
+  documentKind          EvidenceDocumentKind
+  retainDays            Int
+  dispositionReviewDays Int                       @default(30)
+  active                Boolean                   @default(true)
+  createdAt             DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                  @updatedAt @db.Timestamptz(3)
+  documents             ServiceEvidenceDocument[]
+
+  @@index([jurisdiction, documentKind, active])
+  @@map("retention_policies")
+}
+
+model LegalHold {
+  id             String                   @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder             @relation(fields: [serviceOrderId], references: [id], onDelete: Restrict)
+  documentId     String?
+  document       ServiceEvidenceDocument? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  status         LegalHoldStatus          @default(ACTIVE)
+  reason         String
+  reference      String
+  placedById     String
+  placedBy       User                     @relation("LegalHoldPlacer", fields: [placedById], references: [id])
+  placedAt       DateTime                 @default(now()) @db.Timestamptz(3)
+  releasedById   String?
+  releasedBy     User?                    @relation("LegalHoldReleaser", fields: [releasedById], references: [id])
+  releaseReason  String?
+  releasedAt     DateTime?                @db.Timestamptz(3)
+
+  @@index([serviceOrderId, status])
+  @@index([documentId, status])
+  @@map("legal_holds")
+}
+
+model EvidenceExport {
+  id               String       @id @default(uuid())
+  serviceOrderId   String
+  serviceOrder     ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Restrict)
+  requestedById    String
+  requestedBy      User         @relation("EvidenceExportRequester", fields: [requestedById], references: [id])
+  manifest         Json
+  manifestHash     String
+  storageProvider  String?
+  storageObjectKey String?
+  providerReceipt  String?
+  status           String       @default("REQUESTED")
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  completedAt      DateTime?    @db.Timestamptz(3)
+
+  @@index([serviceOrderId, createdAt])
+  @@map("evidence_exports")
+}
+
+model EvidenceDisposition {
+  id            String                    @id @default(uuid())
+  documentId    String
+  document      ServiceEvidenceDocument   @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  requestedById String
+  requestedBy   User                      @relation("DispositionRequester", fields: [requestedById], references: [id])
+  reviewedById  String?
+  reviewedBy    User?                     @relation("DispositionReviewer", fields: [reviewedById], references: [id])
+  reason        String
+  status        EvidenceDispositionStatus @default(REQUESTED)
+  dueAt         DateTime                  @db.Timestamptz(3)
+  requestedAt   DateTime                  @default(now()) @db.Timestamptz(3)
+  reviewedAt    DateTime?                 @db.Timestamptz(3)
+  completedAt   DateTime?                 @db.Timestamptz(3)
+
+  @@index([documentId, status])
+  @@map("evidence_dispositions")
+}
+
+model EvidenceAuditEvent {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Restrict)
+  entityType     String
+  entityId       String
+  sequence       Int
+  actorId        String
+  action         String
+  payload        Json
+  previousHash   String
+  eventHash      String       @unique
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@unique([serviceOrderId, sequence])
+  @@index([entityType, entityId, createdAt])
+  @@map("evidence_audit_events")
 }

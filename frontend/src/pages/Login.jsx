@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -18,12 +18,7 @@ const Login = () => {
       const user = await login(email, password);
       toast.success(`Welcome back, ${user.firstName}!`);
 
-      // Redirect based on role
-      if (user.role === 'TECHNICIAN') {
-        navigate('/technician');
-      } else {
-        navigate('/');
-      }
+      navigate('/evidence');
     } catch (error) {
       toast.error(error.response?.data?.error || 'Login failed');
     } finally {
@@ -40,8 +35,8 @@ const Login = () => {
             <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <span className="text-white font-bold text-3xl">P</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">PestControl AI</h1>
-            <p className="text-gray-500 mt-2">Sign in to your account</p>
+            <h1 className="text-2xl font-bold text-gray-900">PestControl Evidence</h1>
+            <p className="text-gray-500 mt-2">Sign in to the governed service record workspace</p>
           </div>
 
           {/* Form */}
@@ -70,12 +65,6 @@ const Login = () => {
               />
             </div>
 
-            <div className="flex justify-end">
-              <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                Forgot Password?
-              </Link>
-            </div>
-
             <button
               type="submit"
               disabled={loading}
@@ -92,12 +81,6 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 font-medium mb-2">Demo Credentials:</p>
-            <p className="text-sm text-gray-500">Email: admin@pestcontrol.com</p>
-            <p className="text-sm text-gray-500">Password: password123</p>
-          </div>
         </div>
       </div>
     </div>

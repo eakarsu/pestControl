@@ -10,7 +10,7 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,8 +26,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -39,11 +39,22 @@ export default api;
 // API service functions
 export const authService = {
   login: (data) => api.post('/auth/login', data),
-  register: (data) => api.post('/auth/register', data),
   getMe: () => api.get('/auth/me'),
   updatePassword: (data) => api.put('/auth/password', data),
-  forgotPassword: (data) => api.post('/auth/forgot-password', data),
-  resetPassword: (data) => api.post('/auth/reset-password', data)
+};
+
+export const evidenceService = {
+  list: (orderId) => api.get(`/evidence/orders/${orderId}`),
+  create: (orderId, data) => api.post(`/evidence/orders/${orderId}/documents`, data),
+  addVersion: (documentId, data) => api.post(`/evidence/documents/${documentId}/versions`, data),
+  review: (documentId, data) => api.post(`/evidence/documents/${documentId}/reviews`, data),
+  queueOcr: (documentId, version) => api.post(`/evidence/documents/${documentId}/ocr`, { version }),
+  requestSignature: (documentId, data) => api.post(`/evidence/documents/${documentId}/signatures`, data),
+  queueFiling: (documentId, version) => api.post(`/evidence/documents/${documentId}/file`, { version }),
+  placeHold: (orderId, data) => api.post(`/evidence/orders/${orderId}/holds`, data),
+  releaseHold: (holdId, reason) => api.post(`/evidence/holds/${holdId}/release`, { reason }),
+  requestExport: (orderId) => api.post(`/evidence/orders/${orderId}/exports`, {}),
+  verifyAudit: (orderId) => api.get(`/evidence/orders/${orderId}/audit/verify`),
 };
 
 export const customerService = {

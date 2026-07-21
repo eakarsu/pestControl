@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pest_control}
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes: [pest_control_data:/var/lib/postgresql/data]
+
+  migrate:
+    build:
+      context: .
+      target: operations
+    command: ["npm", "run", "prisma:migrate:deploy"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  web:
+    build: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
+    ports: ["3001:3001"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      target: operations
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      CONNECTOR_ALLOWED_HOSTS: ${CONNECTOR_ALLOWED_HOSTS:-}
+      OCR_PROVIDER_TOKEN: ${OCR_PROVIDER_TOKEN:-}
+      ESIGN_PROVIDER_TOKEN: ${ESIGN_PROVIDER_TOKEN:-}
+      FILING_PROVIDER_TOKEN: ${FILING_PROVIDER_TOKEN:-}
+      STORAGE_PROVIDER_TOKEN: ${STORAGE_PROVIDER_TOKEN:-}
+      TEMPLATE_PROVIDER_TOKEN: ${TEMPLATE_PROVIDER_TOKEN:-}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+volumes:
+  pest_control_data:

@@ -1,15 +1,23 @@
 {
   "name": "pest-control-backend",
   "version": "1.0.0",
-  "description": "Pest Control AI Platform Backend",
+  "description": "Governed pest-control service evidence API",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "check": "find src scripts test -name '*.js' -print0 | xargs -0 -n1 node --check",
+    "test": "node --test test/*.test.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "node prisma/seed.js",
-    "seed": "node prisma/seed.js"
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:status": "prisma migrate status",
+    "create-admin": "node scripts/provision-admin.js",
+    "provision": "node scripts/provision-admin.js",
+    "worker": "node scripts/evidence-worker.js",
+    "worker:once": "node scripts/evidence-worker.js --once",
+    "backup": "bash scripts/backup.sh",
+    "restore": "bash scripts/restore.sh"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
@@ -18,16 +26,12 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^8.2.1",
-    "express-validator": "^7.0.1",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
-    "openai": "^4.20.1",
-    "pdfkit": "^0.18.0",
-    "uuid": "^9.0.1"
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
-    "prisma": "5.22.0"
+    "prisma": "5.22.0",
+    "supertest": "^7.1.4"
   }
 }
