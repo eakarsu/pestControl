@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 const evidenceRoutes = require('./routes/evidence');
 
-const EXPECTED_MIGRATION = '20260720105805_governed_service_evidence';
+const EXPECTED_MIGRATION = '202607240000_openrouter_evidence';
 
 function createApp({ prisma }) {
   const app = express();
@@ -43,6 +43,7 @@ function createApp({ prisma }) {
   app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false }));
   app.use('/api/auth', authRoutes);
   app.use('/api/evidence', evidenceRoutes);
+  app.use('/api/runtime-ai', require('./routes/runtimeAi'));
   app.get('/api/health/live', (_req, res) => res.json({ status: 'ok' }));
   app.get('/api/health/ready', async (_req, res) => {
     try {

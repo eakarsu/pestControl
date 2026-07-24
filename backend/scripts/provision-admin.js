@@ -20,16 +20,15 @@ function operatorName() {
 async function main() {
   const prisma = new PrismaClient();
   try {
-    if (await prisma.user.count() !== 0) throw new Error('Provisioning refused because a user already exists');
     const email = required('PROVISION_ADMIN_EMAIL').toLowerCase();
     const password = required('PROVISION_ADMIN_PASSWORD');
     if (password.length < 14) throw new Error('PROVISION_ADMIN_PASSWORD must contain at least 14 characters');
     const { firstName, lastName } = operatorName();
-    const user = await prisma.user.create({
-      data: {
-        email, password: await bcrypt.hash(password, 12), firstName,
-        lastName, role: 'ADMIN', isActive: true,
-      },
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.upsert({
+      where: { email },
+      create: { email, password: passwordHash, firstName, lastName, role: 'ADMIN', isActive: true },
+      update: { password: passwordHash, firstName, lastName, role: 'ADMIN', isActive: true, authVersion: { increment: 1 } },
       select: { id: true, email: true, role: true },
     });
     console.log(`Provisioned ${user.role} ${user.email} (${user.id})`);
