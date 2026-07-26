@@ -87,6 +87,10 @@ if [[ -z "${JWT_SECRET:-}" || ${#JWT_SECRET} -lt 32 ]]; then echo "JWT_SECRET mu
 if [[ -z "${CORS_ALLOWED_ORIGINS:-}" ]]; then echo "CORS_ALLOWED_ORIGINS is required" >&2; exit 1; fi
 if [[ ! -d "$project_dir/frontend/dist" ]]; then echo "Frontend build is missing; run npm ci && npm run build in frontend" >&2; exit 1; fi
 if [[ ! -d "$project_dir/backend/node_modules/.prisma/client" ]]; then echo "Prisma client is missing; run npm ci && npm run prisma:generate in backend" >&2; exit 1; fi
+if [ "${NODE_ENV:-development}" != production ] && [ "${ENABLE_DEMO_CREDENTIAL_AUTOFILL:-true}" = true ]; then
+  npm --prefix "$project_dir/backend" run prisma:migrate:deploy
+  npm --prefix "$project_dir/backend" run provision
+fi
 
 export NODE_ENV="${NODE_ENV:-production}"
 export FRONTEND_DIST_DIR="$project_dir/frontend/dist"
